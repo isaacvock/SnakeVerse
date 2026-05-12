@@ -21,8 +21,10 @@ from samples import (
     load_samples,
     raw_bam_targets,
     sample_ids,
+    transcriptome_bam_targets,
     trimmed_fastq_targets,
 )
+from refs import genome_slug
 from validation import validate_resolved_config
 
 
@@ -33,6 +35,7 @@ RESULTS_DIR = get_results_dir(config)
 PROJECT_ROOT = config["_ngsflow"]["project_root"]
 SAMPLES = load_samples(config["samples"], config["assay"], PROJECT_ROOT)
 SAMPLE_IDS = sample_ids(SAMPLES)
+GENOME_SLUG = genome_slug(config)
 
 VALIDATION_ERRORS, VALIDATION_WARNINGS = validate_resolved_config(config, SAMPLES)
 if VALIDATION_ERRORS:
@@ -83,9 +86,14 @@ if step_enabled("trimming", False):
 
 ALIGNER = config.get("alignment", {}).get("tool")
 if ALIGNER == "bowtie2":
+    include: str(WORKFLOW_DIR / "rules" / "common" / "index_bowtie2.smk")
     include: str(WORKFLOW_DIR / "rules" / "common" / "align_bowtie2.smk")
 elif ALIGNER == "star":
+    include: str(WORKFLOW_DIR / "rules" / "common" / "index_star.smk")
     include: str(WORKFLOW_DIR / "rules" / "common" / "align_star.smk")
+elif ALIGNER == "bwa_mem2":
+    include: str(WORKFLOW_DIR / "rules" / "common" / "index_bwa_mem2.smk")
+    include: str(WORKFLOW_DIR / "rules" / "common" / "align_bwa_mem2.smk")
 else:
     raise ValueError(f"Unsupported or missing alignment.tool: {ALIGNER}")
 

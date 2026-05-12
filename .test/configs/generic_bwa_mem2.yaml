@@ -1,0 +1,3 @@
+# CI pointer config for a BWA-MEM2 FASTQ-to-BAM dry-run.
+run_config: .test/configs/runs/generic_bwa_mem2.yaml
+

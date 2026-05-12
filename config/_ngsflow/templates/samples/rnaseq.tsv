@@ -1,4 +1,4 @@
 sample_id	unit_id	fastq_1	fastq_2	condition	replicate	strandedness
 ctrl_1	L001	fastq/ctrl_1_R1.fastq.gz	fastq/ctrl_1_R2.fastq.gz	ctrl	1	reverse
 ctrl_2	L001	fastq/ctrl_2_R1.fastq.gz	fastq/ctrl_2_R2.fastq.gz	ctrl	2	reverse
-
+# For single-end data, leave fastq_2 blank.

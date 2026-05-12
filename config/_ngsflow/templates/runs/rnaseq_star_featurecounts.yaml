@@ -23,7 +23,8 @@ outputs:
   trimmed_fastq: true
   raw_bam: true
   filtered_bam: true
+  bam_qc: true
   gene_counts: true
+  transcriptome_bam: true
   bigwig: true
   multiqc: true
-

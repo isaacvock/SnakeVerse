@@ -83,6 +83,24 @@ def render_bowtie2(params: Mapping[str, Any]) -> str:
     return " ".join(parts)
 
 
+def render_bwa_mem2(params: Mapping[str, Any]) -> str:
+    parts: list[str] = []
+    flag_map = {
+        "min_seed_length": "-k",
+        "band_width": "-w",
+        "score_match": "-A",
+        "mismatch_penalty": "-B",
+        "gap_open_penalty": "-O",
+        "gap_extension_penalty": "-E",
+        "clipping_penalty": "-L",
+        "mark_shorter_splits": "-M",
+    }
+    for key, value in params.items():
+        flag = flag_map.get(key, f"--{_dash(key)}")
+        _append_flag(parts, flag, value)
+    return " ".join(parts)
+
+
 def render_star(params: Mapping[str, Any]) -> str:
     parts: list[str] = []
     for key, value in params.items():
@@ -134,6 +152,7 @@ def render_featurecounts(params: Mapping[str, Any]) -> str:
         "count_multimapping_reads": "-M",
         "count_overlapping_features": "-O",
         "paired_end": "-p",
+        "count_read_pairs": "--countReadPairs",
         "require_both_ends_mapped": "-B",
         "count_chimeric_fragments": "-C",
     }
@@ -158,6 +177,7 @@ RENDERERS = {
     "fastqc": render_fastqc,
     "cutadapt": render_cutadapt,
     "bowtie2": render_bowtie2,
+    "bwa_mem2": render_bwa_mem2,
     "star": render_star,
     "featurecounts": render_featurecounts,
     "deeptools": render_deeptools,
@@ -182,7 +202,16 @@ def render_tool_params(
     profile = tool_profile(config, tool)
     params: Mapping[str, Any] = profile.get("params", {}) or {}
     if section:
-        params = params.get(section, {}) or {}
+        if isinstance(params.get(section), Mapping):
+            params = params.get(section, {}) or {}
+        elif section == "align":
+            params = {
+                key: value
+                for key, value in params.items()
+                if key not in {"align", "index", "sort", "filter"}
+            }
+        else:
+            params = {}
     merged = dict(params)
     if overrides:
         merged.update({key: value for key, value in overrides.items() if value is not None})
@@ -196,4 +225,3 @@ def render_tool_params(
 
 def resource_value(config: Mapping[str, Any], rule_name: str, key: str, default: Any) -> Any:
     return config.get("resources", {}).get(rule_name, {}).get(key, default)
-

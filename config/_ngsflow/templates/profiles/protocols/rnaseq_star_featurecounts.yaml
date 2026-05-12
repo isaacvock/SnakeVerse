@@ -4,6 +4,7 @@ steps:
   trimming: true
   alignment: true
   bam_filter: true
+  bam_qc: true
   coverage: true
   gene_counts: true
   multiqc: true
@@ -30,6 +31,26 @@ resources:
     threads: 12
     mem_mb: 32000
     runtime_min: 360
+  star_index:
+    threads: 8
+    mem_mb: 32000
+    runtime_min: 480
+  bowtie2:
+    threads: 8
+    mem_mb: 8192
+    runtime_min: 240
+  bowtie2_index:
+    threads: 4
+    mem_mb: 8192
+    runtime_min: 240
+  bwa_mem2:
+    threads: 8
+    mem_mb: 8192
+    runtime_min: 240
+  bwa_mem2_index:
+    threads: 4
+    mem_mb: 8192
+    runtime_min: 240
   samtools_filter:
     threads: 4
     mem_mb: 4096
@@ -50,4 +71,3 @@ resources:
     threads: 1
     mem_mb: 2048
     runtime_min: 60
-

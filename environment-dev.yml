@@ -24,6 +24,7 @@ dependencies:
   - fastqc
   - cutadapt
   - bowtie2
+  - bwa-mem2
   - star
   - samtools
   - subread

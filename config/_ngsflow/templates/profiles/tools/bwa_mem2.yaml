@@ -1,0 +1,12 @@
+# Editable BWA-MEM2 profile.
+tool: bwa_mem2
+version: "2.2"
+
+params:
+  index: {}
+  align:
+    mark_shorter_splits: false
+
+# Appended verbatim to the bwa-mem2 mem command.
+extra: ""
+

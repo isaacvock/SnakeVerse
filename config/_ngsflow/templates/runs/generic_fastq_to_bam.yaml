@@ -23,6 +23,6 @@ outputs:
   trimmed_fastq: true
   raw_bam: true
   filtered_bam: true
+  bam_qc: true
   bigwig: true
   multiqc: true
-

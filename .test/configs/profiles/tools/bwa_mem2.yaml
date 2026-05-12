@@ -1,0 +1,10 @@
+tool: bwa_mem2
+version: "2.2"
+
+params:
+  index: {}
+  align:
+    mark_shorter_splits: false
+
+extra: ""
+

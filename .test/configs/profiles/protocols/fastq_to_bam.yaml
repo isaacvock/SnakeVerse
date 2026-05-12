@@ -3,6 +3,7 @@ steps:
   trimming: true
   alignment: true
   bam_filter: true
+  bam_qc: true
   coverage: true
   multiqc: true
 
@@ -26,6 +27,26 @@ resources:
     threads: 2
     mem_mb: 2048
     runtime_min: 60
+  bowtie2_index:
+    threads: 2
+    mem_mb: 2048
+    runtime_min: 60
+  bwa_mem2:
+    threads: 2
+    mem_mb: 2048
+    runtime_min: 60
+  bwa_mem2_index:
+    threads: 2
+    mem_mb: 2048
+    runtime_min: 60
+  star:
+    threads: 2
+    mem_mb: 4096
+    runtime_min: 90
+  star_index:
+    threads: 2
+    mem_mb: 4096
+    runtime_min: 90
   samtools_filter:
     threads: 2
     mem_mb: 1024
@@ -42,4 +63,3 @@ resources:
     threads: 1
     mem_mb: 512
     runtime_min: 15
-

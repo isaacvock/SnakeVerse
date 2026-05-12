@@ -75,6 +75,24 @@ conda activate snakeverse-dev
 
 The workflow itself uses per-rule conda environment YAMLs in `workflow/envs/`.
 
+## Core Capabilities
+
+The current basic workflows support:
+
+- paired-end and single-end FASTQ inputs
+- optional cutadapt trimming
+- FastQC and MultiQC
+- alignment with Bowtie2, STAR, or BWA-MEM2
+- automatic Bowtie2, STAR, or BWA-MEM2 index creation when the selected index
+  path is left blank
+- BAM sorting, indexing, filtering, and samtools QC
+- optional deepTools BigWig generation
+- RNA-seq gene counts with featureCounts
+- optional STAR transcriptome-aligned BAMs
+
+SnakeVerse does not perform RNA-seq differential expression analysis. The RNA-seq
+workflow stops at aligned BAMs, QC, tracks, and read-count matrices.
+
 ## Initialize a Generic FASTQ-to-BAM Run
 
 ```bash
@@ -116,6 +134,7 @@ The RNA-seq preset currently includes:
 - samtools BAM filtering and indexing
 - samtools BAM QC
 - featureCounts gene-level counts
+- optional STAR transcriptome-aligned BAMs
 - optional deepTools BigWig generation
 - MultiQC
 
@@ -123,6 +142,10 @@ The RNA-seq sample sheet includes `condition`, `replicate`, and `strandedness`.
 The `strandedness` column is available to the workflow for strand-aware coverage
 scaffolding. featureCounts strandedness is controlled in the editable
 `config/profiles/tools/featurecounts.yaml` profile.
+
+For single-end data, leave the `fastq_2` value blank in the sample sheet. For
+RNA-seq gene counting, all samples in one run should share the same paired-end or
+single-end layout because featureCounts is executed once across the run.
 
 ## Activate an Existing Run
 
@@ -163,6 +186,34 @@ If the template FASTQ or reference paths have not been replaced with real files,
 Snakemake may report missing input files. Update `config/samples/<run>.tsv` and
 `config/profiles/genomes/<genome>.yaml` before a real run.
 
+## Reference Indexes
+
+Genome profiles can either point to existing indexes or ask SnakeVerse to build
+them. Leave the selected aligner's index path blank to build under the active
+results directory:
+
+```yaml
+genome:
+  name: hg38
+  fasta: resources/genomes/hg38/hg38.fa
+  gtf: resources/genomes/hg38/gencode.annotation.gtf
+  bowtie2_index: ""
+  star_index: ""
+  bwa_mem2_index: ""
+```
+
+If you already have an index, set the corresponding field:
+
+```yaml
+genome:
+  bowtie2_index: resources/genomes/hg38/bowtie2/hg38
+  star_index: resources/genomes/hg38/star
+  bwa_mem2_index: resources/genomes/hg38/bwa_mem2/hg38
+```
+
+STAR index-building uses `genome.fasta` and, when present, `genome.gtf`.
+Bowtie2 and BWA-MEM2 index-building use `genome.fasta`.
+
 ## Cluster and Slurm Execution
 
 SnakeVerse does not implement Slurm or cluster submission logic. Use an external
@@ -189,10 +240,12 @@ tool: bowtie2
 version: "2.5"
 
 params:
-  sensitivity: "--very-sensitive"
-  max_insert_size: 1000
-  no_mixed: false
-  no_discordant: false
+  index: {}
+  align:
+    sensitivity: "--very-sensitive"
+    max_insert_size: 1000
+    no_mixed: false
+    no_discordant: false
 
 extra: ""
 ```
@@ -205,6 +258,25 @@ MultiQC.
 
 `extra` is appended verbatim to the relevant tool command. Use it for flags that
 are too new, too specialized, or too awkward to model structurally yet.
+
+To switch aligners, edit the protocol profile:
+
+```yaml
+alignment:
+  tool: bwa_mem2
+```
+
+Valid values are `bowtie2`, `star`, and `bwa_mem2`. Keep the matching tool
+profile in `config/profiles/tools/`.
+
+For STAR transcriptome-aligned BAMs, set `outputs.transcriptome_bam: true` and
+make sure the STAR align parameters include `TranscriptomeSAM`:
+
+```yaml
+params:
+  align:
+    quantMode: "GeneCounts TranscriptomeSAM"
+```
 
 ## Adding a New Assay or Preset
 
@@ -227,11 +299,10 @@ profile combinations plus assay-specific rules only where needed.
 
 This is first-round infrastructure, not a biologically exhaustive pipeline.
 
-- Sample handling assumes paired-end inputs in the current templates.
 - RNA-seq differential expression is not implemented.
 - Salmon quantification is not implemented yet.
-- Reference preparation and genome index building are not implemented.
-- STAR output handling assumes sorted BAM output from the provided STAR profile.
+- Reference FASTA/GTF acquisition is not implemented.
+- STAR output handling assumes sorted genome BAM output from the provided STAR profile.
 - Validation is intentionally useful but not comprehensive.
 - The helper script is optional and local; it is not an installed Python package.
 
@@ -250,4 +321,3 @@ python config/bin/ngsflow.py explain --configfile config/config.yaml
 python config/bin/ngsflow.py validate --configfile config/config.yaml
 snakemake --configfile config/config.yaml --dry-run
 ```
-

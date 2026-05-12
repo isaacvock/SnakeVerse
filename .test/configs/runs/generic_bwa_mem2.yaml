@@ -1,6 +1,6 @@
 project:
   name: snakeverse_ci
-  run_name: generic
+  run_name: generic_bwa_mem2
 
 assay: generic
 preset: fastq_to_bam
@@ -10,9 +10,10 @@ samples: .test/configs/samples/generic.tsv
 profile_stack:
   - .test/configs/profiles/assays/generic.yaml
   - .test/configs/profiles/protocols/fastq_to_bam.yaml
+  - .test/configs/profiles/protocols/bwa_mem2_override.yaml
   - .test/configs/profiles/genomes/test_genome.yaml
 
-results_dir: .test/results/generic
+results_dir: .test/results/generic_bwa_mem2
 
 outputs:
   fastq_qc: true

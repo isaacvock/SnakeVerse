@@ -125,6 +125,8 @@ quant.sf
 *.ann
 *.amb
 *.sa
+*.0123
+*.bwt.2bit.64
 *.fai
 *.dict
 *.chrom.sizes

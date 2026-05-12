@@ -1,9 +1,11 @@
 from params import render_tool_params, resource_value, tool_extra
-from samples import as_csv
+from refs import aligner_index_inputs, aligner_index_prefix
+from samples import bowtie2_reads_arg
 
 
 rule bowtie2_align:
     input:
+        index=lambda wildcards: aligner_index_inputs(config, RESULTS_DIR, "bowtie2"),
         r1=alignment_r1,
         r2=alignment_r2
     output:
@@ -19,17 +21,16 @@ rule bowtie2_align:
     conda:
         str(WORKFLOW_DIR / "envs" / "bowtie2.yaml")
     params:
-        index=lambda wildcards: config["genome"]["bowtie2_index"],
-        r1_csv=lambda wildcards, input: as_csv(input.r1),
-        r2_csv=lambda wildcards, input: as_csv(input.r2),
-        bowtie2_args=lambda wildcards: render_tool_params(config, "bowtie2"),
+        index=lambda wildcards: aligner_index_prefix(config, RESULTS_DIR, "bowtie2"),
+        reads=lambda wildcards, input: bowtie2_reads_arg(input.r1, input.r2),
+        bowtie2_args=lambda wildcards: render_tool_params(config, "bowtie2", section="align"),
         sort_args=lambda wildcards: render_tool_params(config, "samtools", section="sort"),
         extra=lambda wildcards: tool_extra(config, "bowtie2")
     shell:
         """
         set -euo pipefail
         mkdir -p $(dirname {output.bam}) $(dirname {log})
-        bowtie2 -x {params.index} -1 {params.r1_csv} -2 {params.r2_csv} \
+        bowtie2 -x {params.index} {params.reads} \
             -p {threads} {params.bowtie2_args} {params.extra} 2> {log} \
             | samtools sort -@ {threads} {params.sort_args} -o {output.bam} - 2>> {log}
         samtools index {output.bam} {output.bai} 2>> {log}

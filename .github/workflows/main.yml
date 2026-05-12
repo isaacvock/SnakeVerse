@@ -8,7 +8,7 @@ on:
 
 jobs:
   unit-tests:
-    name: Config, lint, and dry-run tests
+    name: Config, lint, dry-run, and full workflow tests
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -26,6 +26,15 @@ jobs:
             python=3.12
             snakemake
             pyyaml
+            fastqc
+            cutadapt
+            bowtie2
+            bwa-mem2
+            star
+            samtools
+            subread
+            deeptools
+            multiqc
           condarc: |
             channels:
               - conda-forge
@@ -39,6 +48,7 @@ jobs:
             config/bin/ngsflow.py \
             workflow/lib/config.py \
             workflow/lib/params.py \
+            workflow/lib/refs.py \
             workflow/lib/samples.py \
             workflow/lib/tracks.py \
             workflow/lib/validation.py
@@ -52,14 +62,35 @@ jobs:
           python config/bin/ngsflow.py validate --configfile .test/configs/generic.yaml
           python config/bin/ngsflow.py explain --configfile .test/configs/rnaseq.yaml
           python config/bin/ngsflow.py validate --configfile .test/configs/rnaseq.yaml
+          python config/bin/ngsflow.py explain --configfile .test/configs/generic_bwa_mem2.yaml
+          python config/bin/ngsflow.py validate --configfile .test/configs/generic_bwa_mem2.yaml
 
       - name: Snakemake lint
         run: |
           snakemake --snakefile workflow/Snakefile --configfile .test/configs/generic.yaml --lint
           snakemake --snakefile workflow/Snakefile --configfile .test/configs/rnaseq.yaml --lint
+          snakemake --snakefile workflow/Snakefile --configfile .test/configs/generic_bwa_mem2.yaml --lint
 
       - name: Snakemake dry-runs
         run: |
           snakemake --snakefile workflow/Snakefile --configfile .test/configs/generic.yaml --dry-run --cores 2 --printshellcmds
           snakemake --snakefile workflow/Snakefile --configfile .test/configs/rnaseq.yaml --dry-run --cores 2 --printshellcmds
+          snakemake --snakefile workflow/Snakefile --configfile .test/configs/generic_bwa_mem2.yaml --dry-run --cores 2 --printshellcmds
 
+      - name: Full generic FASTQ-to-BAM run
+        run: |
+          snakemake --snakefile workflow/Snakefile \
+            --configfile .test/configs/generic.yaml \
+            --cores 2 \
+            --printshellcmds \
+            --show-failed-logs \
+            --latency-wait 30
+
+      - name: Full RNA-seq run
+        run: |
+          snakemake --snakefile workflow/Snakefile \
+            --configfile .test/configs/rnaseq.yaml \
+            --cores 2 \
+            --printshellcmds \
+            --show-failed-logs \
+            --latency-wait 30

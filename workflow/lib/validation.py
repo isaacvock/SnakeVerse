@@ -3,7 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from samples import required_columns_for_assay
+from refs import INDEX_KEYS, configured_index, genome_fasta, path_exists
+from samples import featurecounts_paired_end, required_columns_for_assay, sample_ids, sample_layout
 
 
 def _project_path(config: dict[str, Any], value: str) -> Path:
@@ -45,21 +46,38 @@ def validate_resolved_config(config: dict[str, Any], samples: list[dict[str, str
         errors.append("Missing active tool profiles: " + ", ".join(missing_tools))
 
     genome = config.get("genome", {}) or {}
-    if aligner == "bowtie2" and not genome.get("bowtie2_index"):
-        errors.append("Genome profile must define genome.bowtie2_index for Bowtie2 runs")
-    if aligner == "star" and not genome.get("star_index"):
-        errors.append("Genome profile must define genome.star_index for STAR runs")
+    if aligner not in {"bowtie2", "star", "bwa_mem2"}:
+        errors.append(f"Unsupported alignment.tool: {aligner}")
+    if aligner in INDEX_KEYS and not configured_index(config, aligner) and not genome_fasta(config):
+        errors.append(f"Genome profile must define genome.fasta when building a {aligner} index")
     if assay == "rnaseq" and not genome.get("gtf"):
         errors.append("Genome profile must define genome.gtf for RNA-seq featureCounts")
+    if assay == "rnaseq" and config.get("outputs", {}).get("gene_counts", False):
+        try:
+            featurecounts_paired_end(samples, config)
+        except ValueError as exc:
+            errors.append(str(exc))
+    if config.get("outputs", {}).get("transcriptome_bam", False):
+        if aligner != "star":
+            errors.append("outputs.transcriptome_bam requires alignment.tool: star")
+        star_params = config.get("tools", {}).get("star", {}).get("params", {})
+        align_params = star_params.get("align", star_params)
+        quant_mode = str(align_params.get("quantMode", ""))
+        if "TranscriptomeSAM" not in quant_mode:
+            errors.append("STAR transcriptome BAM output requires star.params.align.quantMode to include TranscriptomeSAM")
 
-    for ref_key in ("fasta", "gtf", "chrom_sizes", "bowtie2_index", "star_index"):
+    for ref_key in ("fasta", "gtf", "chrom_sizes", "bowtie2_index", "star_index", "bwa_mem2_index"):
         value = genome.get(ref_key)
         if value:
-            ref_path = _project_path(config, str(value))
-            if not ref_path.exists():
+            if not path_exists(config.get("_ngsflow", {}).get("project_root", "."), str(value)):
                 warnings.append(f"Reference path for genome.{ref_key} does not exist yet: {value}")
 
     required_cols = required_columns_for_assay(str(assay))
+    for sample in sample_ids(samples):
+        try:
+            sample_layout(samples, sample)
+        except ValueError as exc:
+            errors.append(str(exc))
     for row in samples:
         for column in required_cols:
             if not row.get(column):
@@ -70,4 +88,3 @@ def validate_resolved_config(config: dict[str, Any], samples: list[dict[str, str
                 warnings.append(f"FASTQ path does not exist yet: {fastq}")
 
     return errors, warnings
-

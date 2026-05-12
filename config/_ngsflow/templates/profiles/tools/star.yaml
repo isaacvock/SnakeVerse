@@ -3,15 +3,17 @@ tool: star
 version: "2.7.11b"
 
 params:
-  readFilesCommand: zcat
-  outSAMtype: "BAM SortedByCoordinate"
-  outFilterMultimapNmax: 20
-  outFilterMismatchNoverReadLmax: 0.04
-  alignSJoverhangMin: 8
-  alignSJDBoverhangMin: 1
-  outSAMattributes: "NH HI AS NM MD"
-  quantMode: "GeneCounts"
+  index:
+    sjdbOverhang: 99
+  align:
+    readFilesCommand: zcat
+    outSAMtype: "BAM SortedByCoordinate"
+    outFilterMultimapNmax: 20
+    outFilterMismatchNoverReadLmax: 0.04
+    alignSJoverhangMin: 8
+    alignSJDBoverhangMin: 1
+    outSAMattributes: "NH HI AS NM MD"
+    quantMode: "GeneCounts TranscriptomeSAM"
 
 # Appended verbatim to the STAR command.
 extra: ""
-

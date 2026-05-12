@@ -12,7 +12,8 @@ if output_enabled("raw_bam"):
 if output_enabled("filtered_bam") and step_enabled("bam_filter", True):
     GENERIC_TARGETS.extend(filtered_bam_targets(SAMPLES, RESULTS_DIR))
 
-GENERIC_TARGETS.extend(bam_qc_targets(SAMPLES, RESULTS_DIR))
+if output_enabled("bam_qc") and step_enabled("bam_qc", True):
+    GENERIC_TARGETS.extend(bam_qc_targets(SAMPLES, RESULTS_DIR))
 
 if output_enabled("bigwig") and step_enabled("coverage", False):
     GENERIC_TARGETS.extend(bigwig_targets(SAMPLES, RESULTS_DIR))
@@ -23,4 +24,3 @@ if output_enabled("multiqc"):
     GENERIC_TARGETS.append(f"{RESULTS_DIR}/multiqc/multiqc_report.html")
 
 ASSAY_TARGETS.extend(GENERIC_TARGETS)
-

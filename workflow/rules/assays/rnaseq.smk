@@ -1,4 +1,5 @@
 from params import render_tool_params, resource_value, tool_extra
+from samples import featurecounts_count_read_pairs, featurecounts_paired_end
 
 
 RNASEQ_TARGETS = []
@@ -15,10 +16,14 @@ if output_enabled("raw_bam"):
 if output_enabled("filtered_bam") and step_enabled("bam_filter", True):
     RNASEQ_TARGETS.extend(filtered_bam_targets(SAMPLES, RESULTS_DIR))
 
-RNASEQ_TARGETS.extend(bam_qc_targets(SAMPLES, RESULTS_DIR))
+if output_enabled("bam_qc") and step_enabled("bam_qc", True):
+    RNASEQ_TARGETS.extend(bam_qc_targets(SAMPLES, RESULTS_DIR))
 
 if output_enabled("gene_counts"):
     RNASEQ_TARGETS.append(f"{RESULTS_DIR}/counts/featurecounts/gene_counts.txt")
+
+if output_enabled("transcriptome_bam"):
+    RNASEQ_TARGETS.extend(transcriptome_bam_targets(SAMPLES, RESULTS_DIR))
 
 if output_enabled("bigwig") and step_enabled("coverage", False):
     RNASEQ_TARGETS.extend(bigwig_targets(SAMPLES, RESULTS_DIR))
@@ -49,7 +54,14 @@ rule featurecounts:
         str(WORKFLOW_DIR / "envs" / "subread.yaml")
     params:
         annotation=lambda wildcards: config["genome"]["gtf"],
-        rendered=lambda wildcards: render_tool_params(config, "featurecounts"),
+        rendered=lambda wildcards: render_tool_params(
+            config,
+            "featurecounts",
+            overrides={
+                "paired_end": featurecounts_paired_end(SAMPLES, config),
+                "count_read_pairs": featurecounts_count_read_pairs(SAMPLES, config),
+            },
+        ),
         extra=lambda wildcards: tool_extra(config, "featurecounts")
     shell:
         """

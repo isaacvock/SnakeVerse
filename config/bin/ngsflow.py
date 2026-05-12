@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import io
 import sys
 from copy import deepcopy
 from pathlib import Path
@@ -180,17 +181,17 @@ def required_sample_columns(assay: str) -> list[str]:
             "sample_id",
             "unit_id",
             "fastq_1",
-            "fastq_2",
             "condition",
             "replicate",
             "strandedness",
         ]
-    return ["sample_id", "unit_id", "fastq_1", "fastq_2"]
+    return ["sample_id", "unit_id", "fastq_1"]
 
 
 def read_samples(sample_path: Path) -> tuple[list[str], list[dict[str, str]]]:
     with sample_path.open("r", encoding="utf-8", newline="") as handle:
-        reader = csv.DictReader(handle, delimiter="\t")
+        text = "".join(line for line in handle if not line.lstrip().startswith("#"))
+        reader = csv.DictReader(io.StringIO(text), delimiter="\t")
         rows = [
             {key: (value or "").strip() for key, value in row.items()}
             for row in reader
@@ -351,6 +352,7 @@ def validation_messages(config: dict[str, Any]) -> tuple[list[str], list[str]]:
     if missing_columns:
         errors.append("Samples file is missing columns: " + ", ".join(missing_columns))
     for row in rows:
+        row.setdefault("fastq_2", "")
         sample = row.get("sample_id", "<unknown>")
         for column in required:
             if not row.get(column):
@@ -367,6 +369,23 @@ def validation_messages(config: dict[str, Any]) -> tuple[list[str], list[str]]:
             value = row.get(column)
             if value and not project_path(value, project_root).exists():
                 warnings.append(f"FASTQ path does not exist yet: {value}")
+    if config.get("assay") == "rnaseq" and (config.get("outputs") or {}).get("gene_counts", False):
+        layouts = {"paired" if row.get("fastq_2") else "single" for row in rows}
+        if len(layouts) > 1:
+            errors.append("featureCounts requires all samples in a run to share PE/SE layout")
+        featurecounts_params = (
+            config.get("tools", {}).get("featurecounts", {}).get("params", {}) or {}
+        )
+        if featurecounts_params.get("paired_end") is True and layouts == {"single"}:
+            errors.append("featureCounts paired_end is true, but the sample sheet is single-end")
+    units_by_sample: dict[str, set[str]] = {}
+    for row in rows:
+        units_by_sample.setdefault(row.get("sample_id", "<unknown>"), set()).add(
+            "paired" if row.get("fastq_2") else "single"
+        )
+    for sample, layouts in units_by_sample.items():
+        if len(layouts) > 1:
+            errors.append(f"Sample {sample} mixes paired-end and single-end units")
 
     aligner = (config.get("alignment") or {}).get("tool")
     required_tools = ["fastqc", "samtools", "multiqc"]
@@ -385,14 +404,27 @@ def validation_messages(config: dict[str, Any]) -> tuple[list[str], list[str]]:
         errors.append("Missing active tool profiles: " + ", ".join(missing_tools))
 
     genome = config.get("genome") or {}
-    if aligner == "bowtie2" and not genome.get("bowtie2_index"):
-        errors.append("Genome profile must define genome.bowtie2_index for Bowtie2 runs")
-    if aligner == "star" and not genome.get("star_index"):
-        errors.append("Genome profile must define genome.star_index for STAR runs")
+    index_keys = {
+        "bowtie2": "bowtie2_index",
+        "star": "star_index",
+        "bwa_mem2": "bwa_mem2_index",
+    }
+    if aligner not in index_keys:
+        errors.append(f"Unsupported alignment.tool: {aligner}")
+    elif not genome.get(index_keys[aligner]) and not genome.get("fasta"):
+        errors.append(f"Genome profile must define genome.fasta when building a {aligner} index")
     if config.get("assay") == "rnaseq" and not genome.get("gtf"):
         errors.append("Genome profile must define genome.gtf for RNA-seq runs")
+    if config.get("outputs", {}).get("transcriptome_bam", False):
+        if aligner != "star":
+            errors.append("outputs.transcriptome_bam requires alignment.tool: star")
+        star_params = (config.get("tools", {}).get("star", {}).get("params", {}) or {})
+        align_params = star_params.get("align", star_params)
+        quant_mode = str(align_params.get("quantMode", ""))
+        if "TranscriptomeSAM" not in quant_mode:
+            errors.append("STAR transcriptome BAM output requires star.params.align.quantMode to include TranscriptomeSAM")
 
-    for key in ("fasta", "gtf", "chrom_sizes", "bowtie2_index", "star_index"):
+    for key in ("fasta", "gtf", "chrom_sizes", "bowtie2_index", "star_index", "bwa_mem2_index"):
         value = genome.get(key)
         if value and not project_path(str(value), project_root).exists():
             warnings.append(f"Reference path for genome.{key} does not exist yet: {value}")

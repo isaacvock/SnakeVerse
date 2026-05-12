@@ -4,7 +4,6 @@ required_columns:
   - sample_id
   - unit_id
   - fastq_1
-  - fastq_2
 columns:
   sample_id:
     description: "Biological sample identifier."
@@ -13,5 +12,4 @@ columns:
   fastq_1:
     description: "Path to R1 FASTQ, relative to the project root or absolute."
   fastq_2:
-    description: "Path to R2 FASTQ, relative to the project root or absolute."
-
+    description: "Optional path to R2 FASTQ. Leave blank or omit for single-end data."

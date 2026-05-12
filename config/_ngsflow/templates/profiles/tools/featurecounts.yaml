@@ -7,11 +7,11 @@ params:
   attribute_type: gene_id
   # 0 = unstranded, 1 = stranded, 2 = reversely stranded.
   strand: 0
-  paired_end: true
+  paired_end: auto
+  count_read_pairs: auto
   require_both_ends_mapped: false
   count_multimapping_reads: false
   count_overlapping_features: false
 
 # Appended verbatim to the featureCounts command.
 extra: ""
-

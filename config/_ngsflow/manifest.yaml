@@ -15,6 +15,8 @@ assays:
             - fastqc.yaml
             - cutadapt.yaml
             - bowtie2.yaml
+            - bwa_mem2.yaml
+            - star.yaml
             - samtools.yaml
             - deeptools.yaml
             - multiqc.yaml
@@ -36,6 +38,8 @@ assays:
           tools:
             - fastqc.yaml
             - cutadapt.yaml
+            - bowtie2.yaml
+            - bwa_mem2.yaml
             - star.yaml
             - samtools.yaml
             - featurecounts.yaml
@@ -43,4 +47,3 @@ assays:
             - multiqc.yaml
           genomes:
             - hg38.yaml
-
