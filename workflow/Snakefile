@@ -44,52 +44,27 @@ for warning in VALIDATION_WARNINGS:
     print(f"SnakeVerse warning: {warning}")
 
 
-def output_enabled(name):
-    return bool(config.get("outputs", {}).get(name, False))
+output_enabled = lambda name: bool(config.get("outputs", {}).get(name, False))
+step_enabled = lambda name, default=True: bool(config.get("steps", {}).get(name, default))
+trimming_for_alignment = lambda: step_enabled("trimming", False)
 
+raw_bam_path = lambda sample: f"{RESULTS_DIR}/bam/raw/{sample}.bam"
+raw_bai_path = lambda sample: f"{RESULTS_DIR}/bam/raw/{sample}.bam.bai"
+filtered_bam_path = lambda sample: f"{RESULTS_DIR}/bam/filtered/{sample}.bam"
+filtered_bai_path = lambda sample: f"{RESULTS_DIR}/bam/filtered/{sample}.bam.bai"
+final_bam_path = lambda sample: (
+    filtered_bam_path(sample) if step_enabled("bam_filter", True) else raw_bam_path(sample)
+)
+final_bai_path = lambda sample: (
+    filtered_bai_path(sample) if step_enabled("bam_filter", True) else raw_bai_path(sample)
+)
 
-def step_enabled(name, default=True):
-    return bool(config.get("steps", {}).get(name, default))
-
-
-def trimming_for_alignment():
-    return step_enabled("trimming", False)
-
-
-def raw_bam_path(sample):
-    return f"{RESULTS_DIR}/bam/raw/{sample}.bam"
-
-
-def raw_bai_path(sample):
-    return f"{RESULTS_DIR}/bam/raw/{sample}.bam.bai"
-
-
-def filtered_bam_path(sample):
-    return f"{RESULTS_DIR}/bam/filtered/{sample}.bam"
-
-
-def filtered_bai_path(sample):
-    return f"{RESULTS_DIR}/bam/filtered/{sample}.bam.bai"
-
-
-def final_bam_path(sample):
-    if step_enabled("bam_filter", True):
-        return filtered_bam_path(sample)
-    return raw_bam_path(sample)
-
-
-def final_bai_path(sample):
-    if step_enabled("bam_filter", True):
-        return filtered_bai_path(sample)
-    return raw_bai_path(sample)
-
-
-def alignment_r1(wildcards):
-    return alignment_fastq_1(SAMPLES, wildcards.sample, RESULTS_DIR, trimming_for_alignment())
-
-
-def alignment_r2(wildcards):
-    return alignment_fastq_2(SAMPLES, wildcards.sample, RESULTS_DIR, trimming_for_alignment())
+alignment_r1 = lambda wildcards: alignment_fastq_1(
+    SAMPLES, wildcards.sample, RESULTS_DIR, trimming_for_alignment()
+)
+alignment_r2 = lambda wildcards: alignment_fastq_2(
+    SAMPLES, wildcards.sample, RESULTS_DIR, trimming_for_alignment()
+)
 
 
 ASSAY_TARGETS = []

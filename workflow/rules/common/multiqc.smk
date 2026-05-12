@@ -16,12 +16,14 @@ rule multiqc:
     conda:
         str(WORKFLOW_DIR / "envs" / "multiqc.yaml")
     params:
-        outdir=f"{RESULTS_DIR}/multiqc",
+        search_dir=lambda wildcards, output: Path(output.html).parents[1].as_posix(),
+        outdir=lambda wildcards, output: Path(output.html).parent.as_posix(),
+        filename=lambda wildcards, output: Path(output.html).name,
         rendered=lambda wildcards: render_tool_params(config, "multiqc"),
         extra=lambda wildcards: tool_extra(config, "multiqc")
     shell:
         """
         mkdir -p {params.outdir} $(dirname {log})
-        multiqc {RESULTS_DIR} --outdir {params.outdir} --filename multiqc_report.html \
+        multiqc {params.search_dir} --outdir {params.outdir} --filename {params.filename} \
             {params.rendered} {params.extra} > {log} 2>&1
         """
