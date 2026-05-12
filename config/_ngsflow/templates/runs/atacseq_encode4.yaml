@@ -5,7 +5,7 @@ project:
   run_name: "{{RUN_NAME}}"
 
 assay: atacseq
-preset: encode4_bowtie2_macs2
+preset: encode4_bowtie2_macs3
 
 samples: config/samples/{{RUN_NAME}}.tsv
 
@@ -29,4 +29,3 @@ outputs:
   fragment_lengths: true
   tss_enrichment: false
   multiqc: true
-

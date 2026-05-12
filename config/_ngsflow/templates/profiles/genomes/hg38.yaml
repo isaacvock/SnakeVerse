@@ -12,4 +12,4 @@ genome:
   star_index: ""
   bwa_mem2_index: ""
   effective_genome_size: 2913022398
-  macs2_genome_size: hs
+  macs3_genome_size: hs

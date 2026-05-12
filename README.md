@@ -5,7 +5,7 @@ The current scaffold supports three profile stacks:
 
 - generic FASTQ-to-BAM processing for custom or unusual assays
 - bulk RNA-seq with STAR alignment and featureCounts gene counting
-- ATAC-seq with ENCODE4-oriented Bowtie2 alignment, filtering, MACS2 peaks,
+- ATAC-seq with ENCODE4-oriented Bowtie2 alignment, filtering, MACS3 peaks,
   signal tracks, and QC metrics
 
 The repository is intentionally Snakemake-native. SnakeVerse provides workflow
@@ -91,7 +91,7 @@ The current basic workflows support:
 - optional deepTools BigWig generation
 - RNA-seq gene counts with featureCounts
 - optional STAR transcriptome-aligned BAMs
-- ATAC-seq duplicate marking, mitochondrial/blacklist filtering, MACS2
+- ATAC-seq duplicate marking, mitochondrial/blacklist filtering, MACS3
   narrowPeak calls, FRiP, library complexity, fragment length summaries, and an
   optional simple TSS enrichment proxy
 
@@ -157,7 +157,7 @@ single-end layout because featureCounts is executed once across the run.
 ```bash
 python config/bin/ngsflow.py init-run \
   --assay atacseq \
-  --preset encode4_bowtie2_macs2 \
+  --preset encode4_bowtie2_macs3 \
   --genome hg38 \
   --run-name atacseq
 ```
@@ -172,7 +172,7 @@ read depth, IDR, FRiP, TSS enrichment, and library complexity:
 https://www.encodeproject.org/data-standards/atac-seq/atac-encode4/
 
 The initial SnakeVerse ATAC profile does not yet implement replicated IDR peak
-selection or pseudoreplicates. It produces per-sample MACS2 narrowPeak files and
+selection or pseudoreplicates. It produces per-sample MACS3 narrowPeak files and
 QC outputs that make a future IDR layer straightforward to add.
 
 For single-end ATAC-seq data, leave `fastq_2` blank in the sample sheet. The
@@ -285,7 +285,7 @@ extra: ""
 The workflow renders these structured settings into command-line arguments.
 Boolean values become flags when true and are omitted when false. Strings and
 numbers become flag values. Tool-specific renderers handle common differences
-for Bowtie2, STAR, samtools, featureCounts, deepTools, cutadapt, FastQC, MACS2,
+for Bowtie2, STAR, samtools, featureCounts, deepTools, cutadapt, FastQC, MACS3,
 and MultiQC.
 
 `extra` is appended verbatim to the relevant tool command. Use it for flags that
@@ -355,7 +355,7 @@ python config/bin/ngsflow.py explain --configfile config/config.yaml
 python config/bin/ngsflow.py validate --configfile config/config.yaml
 snakemake --configfile config/config.yaml --dry-run
 
-python config/bin/ngsflow.py init-run --assay atacseq --preset encode4_bowtie2_macs2 --genome hg38 --run-name atacseq --overwrite
+python config/bin/ngsflow.py init-run --assay atacseq --preset encode4_bowtie2_macs3 --genome hg38 --run-name atacseq --overwrite
 python config/bin/ngsflow.py explain --configfile config/config.yaml
 python config/bin/ngsflow.py validate --configfile config/config.yaml
 snakemake --configfile config/config.yaml --dry-run

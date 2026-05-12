@@ -1,5 +1,5 @@
-tool: macs2
-version: "2.2"
+tool: macs3
+version: "3"
 
 params:
   callpeak:
@@ -12,3 +12,4 @@ params:
     extsize:
 
 extra: ""
+

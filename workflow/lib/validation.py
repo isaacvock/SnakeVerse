@@ -38,7 +38,7 @@ def validate_resolved_config(config: dict[str, Any], samples: list[dict[str, str
     if assay == "rnaseq":
         required_tools.append("featurecounts")
     if assay == "atacseq":
-        required_tools.extend(["macs2", "bedtools"])
+        required_tools.extend(["macs3", "bedtools"])
     if config.get("steps", {}).get("coverage", False):
         required_tools.append("deeptools")
     for tool in sorted(set(required_tools)):

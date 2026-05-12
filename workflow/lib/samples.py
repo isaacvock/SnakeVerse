@@ -196,7 +196,7 @@ def bigwig_targets(samples: list[dict[str, str]], results_dir: str) -> list[str]
 
 
 def narrowpeak_targets(samples: list[dict[str, str]], results_dir: str) -> list[str]:
-    return [f"{results_dir}/peaks/macs2/{sample}/{sample}_peaks.narrowPeak" for sample in sample_ids(samples)]
+    return [f"{results_dir}/peaks/macs3/{sample}/{sample}_peaks.narrowPeak" for sample in sample_ids(samples)]
 
 
 def frip_targets(samples: list[dict[str, str]], results_dir: str) -> list[str]:

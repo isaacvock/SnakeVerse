@@ -398,7 +398,7 @@ def validation_messages(config: dict[str, Any]) -> tuple[list[str], list[str]]:
     if config.get("assay") == "rnaseq":
         required_tools.append("featurecounts")
     if config.get("assay") == "atacseq":
-        required_tools.extend(["bedtools", "macs2"])
+        required_tools.extend(["bedtools", "macs3"])
     if (config.get("steps") or {}).get("coverage", False):
         required_tools.append("deeptools")
     missing_tools = [

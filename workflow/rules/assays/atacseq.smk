@@ -52,42 +52,42 @@ if output_enabled("multiqc"):
 ASSAY_TARGETS.extend(ATACSEQ_TARGETS)
 
 
-rule macs2_callpeak:
+rule macs3_callpeak:
     input:
         bam=lambda wildcards: final_bam_path(wildcards.sample),
         bai=lambda wildcards: final_bai_path(wildcards.sample)
     output:
-        narrowpeak=f"{RESULTS_DIR}/peaks/macs2/{{sample}}/{{sample}}_peaks.narrowPeak",
-        xls=f"{RESULTS_DIR}/peaks/macs2/{{sample}}/{{sample}}_peaks.xls",
-        summits=f"{RESULTS_DIR}/peaks/macs2/{{sample}}/{{sample}}_summits.bed"
+        narrowpeak=f"{RESULTS_DIR}/peaks/macs3/{{sample}}/{{sample}}_peaks.narrowPeak",
+        xls=f"{RESULTS_DIR}/peaks/macs3/{{sample}}/{{sample}}_peaks.xls",
+        summits=f"{RESULTS_DIR}/peaks/macs3/{{sample}}/{{sample}}_summits.bed"
     log:
-        f"{RESULTS_DIR}/logs/macs2/{{sample}}.log"
+        f"{RESULTS_DIR}/logs/macs3/{{sample}}.log"
     threads:
-        int(resource_value(config, "macs2", "threads", 1))
+        int(resource_value(config, "macs3", "threads", 1))
     resources:
-        mem_mb=int(resource_value(config, "macs2", "mem_mb", 4096)),
-        runtime_min=int(resource_value(config, "macs2", "runtime_min", 120))
+        mem_mb=int(resource_value(config, "macs3", "mem_mb", 4096)),
+        runtime_min=int(resource_value(config, "macs3", "runtime_min", 120))
     conda:
-        str(WORKFLOW_DIR / "envs" / "macs2.yaml")
+        str(WORKFLOW_DIR / "envs" / "macs3.yaml")
     params:
         outdir=lambda wildcards, output: Path(output.narrowpeak).parent.as_posix(),
         name=lambda wildcards: wildcards.sample,
         fmt=lambda wildcards: "BAMPE" if sample_layout(SAMPLES, wildcards.sample) == "paired" else "BAM",
         rendered=lambda wildcards: render_tool_params(
             config,
-            "macs2",
+            "macs3",
             section="callpeak",
             overrides={
-                "genome_size": config.get("tools", {}).get("macs2", {}).get("params", {}).get("callpeak", {}).get("genome_size")
-                or config.get("genome", {}).get("macs2_genome_size")
+                "genome_size": config.get("tools", {}).get("macs3", {}).get("params", {}).get("callpeak", {}).get("genome_size")
+                or config.get("genome", {}).get("macs3_genome_size")
                 or config.get("genome", {}).get("effective_genome_size")
             },
         ),
-        extra=lambda wildcards: tool_extra(config, "macs2")
+        extra=lambda wildcards: tool_extra(config, "macs3")
     shell:
         """
         mkdir -p {params.outdir} $(dirname {log})
-        macs2 callpeak -t {input.bam} -f {params.fmt} -n {params.name} \
+        macs3 callpeak -t {input.bam} -f {params.fmt} -n {params.name} \
             --outdir {params.outdir} {params.rendered} {params.extra} > {log} 2>&1
         """
 
@@ -96,7 +96,7 @@ rule atac_frip:
     input:
         bam=lambda wildcards: final_bam_path(wildcards.sample),
         bai=lambda wildcards: final_bai_path(wildcards.sample),
-        peaks=f"{RESULTS_DIR}/peaks/macs2/{{sample}}/{{sample}}_peaks.narrowPeak"
+        peaks=f"{RESULTS_DIR}/peaks/macs3/{{sample}}/{{sample}}_peaks.narrowPeak"
     output:
         f"{RESULTS_DIR}/qc/atac/{{sample}}.frip.txt"
     log:

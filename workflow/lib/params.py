@@ -173,7 +173,7 @@ def render_multiqc(params: Mapping[str, Any]) -> str:
     return render_generic_params(params)
 
 
-def render_macs2(params: Mapping[str, Any]) -> str:
+def render_macs3(params: Mapping[str, Any]) -> str:
     parts: list[str] = []
     flag_map = {
         "genome_size": "-g",
@@ -183,6 +183,12 @@ def render_macs2(params: Mapping[str, Any]) -> str:
         "nomodel": "--nomodel",
         "shift": "--shift",
         "extsize": "--extsize",
+        "bdg": "-B",
+        "trackline": "--trackline",
+        "broad": "--broad",
+        "broad_cutoff": "--broad-cutoff",
+        "cutoff_analysis": "--cutoff-analysis",
+        "scale_to": "--scale-to",
         "call_summits": "--call-summits",
         "nolambda": "--nolambda",
     }
@@ -200,7 +206,7 @@ RENDERERS = {
     "star": render_star,
     "featurecounts": render_featurecounts,
     "deeptools": render_deeptools,
-    "macs2": render_macs2,
+    "macs3": render_macs3,
     "multiqc": render_multiqc,
 }
 

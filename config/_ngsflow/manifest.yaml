@@ -51,8 +51,8 @@ assays:
   atacseq:
     description: "ATAC-seq chromatin accessibility workflow."
     presets:
-      encode4_bowtie2_macs2:
-        description: "ENCODE4-oriented Bowtie2 alignment, filtering, MACS2 peaks, signal, and QC."
+      encode4_bowtie2_macs3:
+        description: "ENCODE4-oriented Bowtie2 alignment, filtering, MACS3 peaks, signal, and QC."
         run_template: runs/atacseq_encode4.yaml
         sample_template: samples/atacseq.tsv
         profiles:
@@ -66,7 +66,7 @@ assays:
             - bowtie2.yaml
             - samtools.yaml
             - bedtools.yaml
-            - macs2.yaml
+            - macs3.yaml
             - deeptools.yaml
             - multiqc.yaml
           genomes:

@@ -1,10 +1,10 @@
-# Editable MACS2 profile for ATAC-seq peak calling.
-tool: macs2
-version: "2.2"
+# Editable MACS3 profile for ATAC-seq peak calling.
+tool: macs3
+version: "3"
 
 params:
   callpeak:
-    # genome_size can be set here, or inherited from genome.macs2_genome_size
+    # genome_size can be set here, or inherited from genome.macs3_genome_size
     # or genome.effective_genome_size.
     genome_size:
     qvalue: 0.01
@@ -16,5 +16,6 @@ params:
     shift:
     extsize:
 
-# Appended verbatim to the MACS2 callpeak command.
+# Appended verbatim to the MACS3 callpeak command.
 extra: ""
+

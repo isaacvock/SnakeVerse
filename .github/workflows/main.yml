@@ -33,6 +33,7 @@ jobs:
             star
             samtools
             bedtools
+            macs3
             subread
             deeptools
             multiqc

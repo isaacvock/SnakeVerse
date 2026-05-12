@@ -15,4 +15,4 @@ CI validates configs, lints the Snakefile, performs dry-runs, and executes:
   and featureCounts gene counts
 - a BWA-MEM2 FASTQ-to-BAM dry-run to exercise the third aligner path
 - an ATAC-seq validate/lint/dry-run path with Bowtie2, duplicate marking,
-  blacklist/TSS reference fields, MACS2 peaks, and ATAC QC targets
+  blacklist/TSS reference fields, MACS3 peaks, and ATAC QC targets

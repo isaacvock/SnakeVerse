@@ -30,5 +30,5 @@ dependencies:
   - subread
   - deeptools
   - bedtools
-  - macs2
+  - macs3
   - multiqc

@@ -1,6 +1,6 @@
 # ENCODE4-oriented ATAC-seq protocol profile.
 # This is a practical first-pass implementation: alignment, duplicate marking,
-# mapQ/mitochondrial/blacklist filtering, signal, MACS2 peaks, and QC metrics.
+# mapQ/mitochondrial/blacklist filtering, signal, MACS3 peaks, and QC metrics.
 # Full replicated IDR peak selection is intentionally not implemented yet.
 steps:
   fastq_qc: true
@@ -68,7 +68,7 @@ resources:
     threads: 4
     mem_mb: 4096
     runtime_min: 120
-  macs2:
+  macs3:
     threads: 1
     mem_mb: 4096
     runtime_min: 120
