@@ -1,0 +1,9 @@
+# Editable bedtools profile.
+tool: bedtools
+version: "2.31"
+
+params: {}
+
+# Reserved for future bedtools options.
+extra: ""
+

@@ -5,8 +5,11 @@ genome:
   fasta: resources/genomes/hg38/hg38.fa
   chrom_sizes: resources/genomes/hg38/hg38.chrom.sizes
   gtf: resources/genomes/hg38/gencode.annotation.gtf
+  blacklist: resources/genomes/hg38/hg38.blacklist.bed
+  tss_bed: resources/genomes/hg38/refseq.tss.bed
   # Leave an index path blank to have SnakeVerse build it under results/<run>/reference/.
   bowtie2_index: ""
   star_index: ""
   bwa_mem2_index: ""
   effective_genome_size: 2913022398
+  macs2_genome_size: hs

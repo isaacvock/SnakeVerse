@@ -1,10 +1,12 @@
 # SnakeVerse
 
 SnakeVerse is an early-stage, modular Snakemake framework for NGS data processing.
-The current scaffold supports two profile stacks:
+The current scaffold supports three profile stacks:
 
 - generic FASTQ-to-BAM processing for custom or unusual assays
 - bulk RNA-seq with STAR alignment and featureCounts gene counting
+- ATAC-seq with ENCODE4-oriented Bowtie2 alignment, filtering, MACS2 peaks,
+  signal tracks, and QC metrics
 
 The repository is intentionally Snakemake-native. SnakeVerse provides workflow
 rules, config templates, and a small local config helper, but Snakemake remains
@@ -89,6 +91,9 @@ The current basic workflows support:
 - optional deepTools BigWig generation
 - RNA-seq gene counts with featureCounts
 - optional STAR transcriptome-aligned BAMs
+- ATAC-seq duplicate marking, mitochondrial/blacklist filtering, MACS2
+  narrowPeak calls, FRiP, library complexity, fragment length summaries, and an
+  optional simple TSS enrichment proxy
 
 SnakeVerse does not perform RNA-seq differential expression analysis. The RNA-seq
 workflow stops at aligned BAMs, QC, tracks, and read-count matrices.
@@ -146,6 +151,33 @@ scaffolding. featureCounts strandedness is controlled in the editable
 For single-end data, leave the `fastq_2` value blank in the sample sheet. For
 RNA-seq gene counting, all samples in one run should share the same paired-end or
 single-end layout because featureCounts is executed once across the run.
+
+## Initialize an ATAC-seq Run
+
+```bash
+python config/bin/ngsflow.py init-run \
+  --assay atacseq \
+  --preset encode4_bowtie2_macs2 \
+  --genome hg38 \
+  --run-name atacseq
+```
+
+The ATAC-seq preset follows the practical shape of the ENCODE4 ATAC-seq
+processing recommendations: Bowtie2 alignment, high-quality filtered BAMs,
+non-mitochondrial/blacklist filtering, normalized signal tracks, peak calls, and
+QC metrics such as FRiP, library complexity, fragment length distribution, and
+TSS enrichment scaffolding. See the ENCODE ATAC-seq standards and processing
+pipeline page for the upstream expectations around biological replicates,
+read depth, IDR, FRiP, TSS enrichment, and library complexity:
+https://www.encodeproject.org/data-standards/atac-seq/atac-encode4/
+
+The initial SnakeVerse ATAC profile does not yet implement replicated IDR peak
+selection or pseudoreplicates. It produces per-sample MACS2 narrowPeak files and
+QC outputs that make a future IDR layer straightforward to add.
+
+For single-end ATAC-seq data, leave `fastq_2` blank in the sample sheet. The
+default ATAC profile expects two or more biological replicate values in the
+`replicate` column and validation will warn when a run has fewer.
 
 ## Activate an Existing Run
 
@@ -253,8 +285,8 @@ extra: ""
 The workflow renders these structured settings into command-line arguments.
 Boolean values become flags when true and are omitted when false. Strings and
 numbers become flag values. Tool-specific renderers handle common differences
-for Bowtie2, STAR, samtools, featureCounts, deepTools, cutadapt, FastQC, and
-MultiQC.
+for Bowtie2, STAR, samtools, featureCounts, deepTools, cutadapt, FastQC, MACS2,
+and MultiQC.
 
 `extra` is appended verbatim to the relevant tool command. Use it for flags that
 are too new, too specialized, or too awkward to model structurally yet.
@@ -291,15 +323,17 @@ The intended extension path is explicit rather than magical:
    introduced.
 6. Keep execution-profile and cluster behavior outside this repository.
 
-Future assay stacks such as ATAC-seq, eCLIP, Ribo-seq, ChIP-seq/CUT&Tag,
-PRO-seq, and SLAM-seq should be expressible as new assay/protocol/tool/genome
-profile combinations plus assay-specific rules only where needed.
+Future assay stacks such as eCLIP, Ribo-seq, ChIP-seq/CUT&Tag, PRO-seq, and
+SLAM-seq should be expressible as new assay/protocol/tool/genome profile
+combinations plus assay-specific rules only where needed.
 
 ## Current Limitations
 
 This is first-round infrastructure, not a biologically exhaustive pipeline.
 
 - RNA-seq differential expression is not implemented.
+- ATAC-seq replicated IDR, pseudoreplicate peak selection, and exact ENCODE
+  TSS enrichment scoring are not implemented yet.
 - Salmon quantification is not implemented yet.
 - Reference FASTA/GTF acquisition is not implemented.
 - STAR output handling assumes sorted genome BAM output from the provided STAR profile.
@@ -317,6 +351,11 @@ python config/bin/ngsflow.py validate --configfile config/config.yaml
 snakemake --configfile config/config.yaml --dry-run
 
 python config/bin/ngsflow.py init-run --assay rnaseq --preset star_featurecounts --genome hg38 --run-name rnaseq --overwrite
+python config/bin/ngsflow.py explain --configfile config/config.yaml
+python config/bin/ngsflow.py validate --configfile config/config.yaml
+snakemake --configfile config/config.yaml --dry-run
+
+python config/bin/ngsflow.py init-run --assay atacseq --preset encode4_bowtie2_macs2 --genome hg38 --run-name atacseq --overwrite
 python config/bin/ngsflow.py explain --configfile config/config.yaml
 python config/bin/ngsflow.py validate --configfile config/config.yaml
 snakemake --configfile config/config.yaml --dry-run

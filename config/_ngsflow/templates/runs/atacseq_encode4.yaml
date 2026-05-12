@@ -1,0 +1,32 @@
+# SnakeVerse run config for ATAC-seq following ENCODE4-oriented defaults.
+# This profile provides core alignment/filtering/QC/peak scaffolding, not full IDR.
+project:
+  name: example_project
+  run_name: "{{RUN_NAME}}"
+
+assay: atacseq
+preset: encode4_bowtie2_macs2
+
+samples: config/samples/{{RUN_NAME}}.tsv
+
+profile_stack:
+  - config/profiles/assays/atacseq.yaml
+  - config/profiles/protocols/atacseq_encode4.yaml
+  - config/profiles/genomes/{{GENOME}}.yaml
+
+results_dir: results/{{RUN_NAME}}
+
+outputs:
+  fastq_qc: true
+  trimmed_fastq: true
+  raw_bam: true
+  filtered_bam: true
+  bam_qc: true
+  bigwig: true
+  peaks: true
+  frip: true
+  library_complexity: true
+  fragment_lengths: true
+  tss_enrichment: false
+  multiqc: true
+

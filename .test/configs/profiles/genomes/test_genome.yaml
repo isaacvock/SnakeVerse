@@ -3,7 +3,10 @@ genome:
   fasta: .test/data/genome/genome.fasta
   chrom_sizes: .test/data/genome/genome.chrom.sizes
   gtf: .test/data/annotation/genome.gtf
+  blacklist: .test/data/annotation/blacklist.bed
+  tss_bed: .test/data/annotation/tss.bed
   bowtie2_index: ""
   star_index: ""
   bwa_mem2_index: ""
   effective_genome_size: 46709983
+  macs2_genome_size: 46709983

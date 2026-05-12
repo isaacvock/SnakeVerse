@@ -1,0 +1,30 @@
+project:
+  name: snakeverse_ci
+  run_name: atacseq
+
+assay: atacseq
+preset: encode4_bowtie2_macs2
+
+samples: .test/configs/samples/atacseq.tsv
+
+profile_stack:
+  - .test/configs/profiles/assays/atacseq.yaml
+  - .test/configs/profiles/protocols/atacseq_encode4.yaml
+  - .test/configs/profiles/genomes/test_genome.yaml
+
+results_dir: .test/results/atacseq
+
+outputs:
+  fastq_qc: true
+  trimmed_fastq: true
+  raw_bam: true
+  filtered_bam: true
+  bam_qc: true
+  bigwig: true
+  peaks: true
+  frip: true
+  library_complexity: true
+  fragment_lengths: true
+  tss_enrichment: true
+  multiqc: true
+

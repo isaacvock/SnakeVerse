@@ -173,6 +173,25 @@ def render_multiqc(params: Mapping[str, Any]) -> str:
     return render_generic_params(params)
 
 
+def render_macs2(params: Mapping[str, Any]) -> str:
+    parts: list[str] = []
+    flag_map = {
+        "genome_size": "-g",
+        "qvalue": "-q",
+        "pvalue": "-p",
+        "keep_dup": "--keep-dup",
+        "nomodel": "--nomodel",
+        "shift": "--shift",
+        "extsize": "--extsize",
+        "call_summits": "--call-summits",
+        "nolambda": "--nolambda",
+    }
+    for key, value in params.items():
+        flag = flag_map.get(key, f"--{_dash(key)}")
+        _append_flag(parts, flag, value)
+    return " ".join(parts)
+
+
 RENDERERS = {
     "fastqc": render_fastqc,
     "cutadapt": render_cutadapt,
@@ -181,6 +200,7 @@ RENDERERS = {
     "star": render_star,
     "featurecounts": render_featurecounts,
     "deeptools": render_deeptools,
+    "macs2": render_macs2,
     "multiqc": render_multiqc,
 }
 

@@ -13,4 +13,3 @@ params:
 
 # Appended verbatim to samtools view in the filtering rule.
 extra: ""
-

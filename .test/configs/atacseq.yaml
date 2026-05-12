@@ -1,0 +1,3 @@
+# CI pointer config for the ATAC-seq stack.
+run_config: .test/configs/runs/atacseq.yaml
+

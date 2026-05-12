@@ -1,0 +1,15 @@
+assay_profile:
+  name: atacseq
+  description: "ATAC-seq accessibility workflow with ENCODE4-oriented defaults."
+
+sample_schema: config/_ngsflow/schemas/samples.atacseq.schema.yaml
+
+atac:
+  tss_flank_bp: 1000
+  tss_center_bp: 50
+  qc_thresholds:
+    frip_acceptable: 0.2
+    frip_preferred: 0.3
+    nrf_preferred: 0.9
+    pbc1_preferred: 0.9
+    pbc2_preferred: 3

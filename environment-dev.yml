@@ -29,4 +29,6 @@ dependencies:
   - samtools
   - subread
   - deeptools
+  - bedtools
+  - macs2
   - multiqc

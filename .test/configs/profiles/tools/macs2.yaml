@@ -1,0 +1,14 @@
+tool: macs2
+version: "2.2"
+
+params:
+  callpeak:
+    genome_size:
+    qvalue: 0.01
+    keep_dup: all
+    call_summits: true
+    nomodel:
+    shift:
+    extsize:
+
+extra: ""

@@ -1,0 +1,22 @@
+title: "SnakeVerse ATAC-seq sample sheet"
+type: object
+required_columns:
+  - sample_id
+  - unit_id
+  - fastq_1
+  - condition
+  - replicate
+columns:
+  sample_id:
+    description: "Biological sample identifier."
+  unit_id:
+    description: "Sequencing unit or lane identifier."
+  fastq_1:
+    description: "Path to R1 FASTQ, relative to the project root or absolute."
+  fastq_2:
+    description: "Optional path to R2 FASTQ. Leave blank or omit for single-end data."
+  condition:
+    description: "Experimental condition label."
+  replicate:
+    description: "Biological replicate label. ENCODE recommends at least two biological replicates."
+

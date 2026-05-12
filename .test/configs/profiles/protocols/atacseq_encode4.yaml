@@ -1,0 +1,87 @@
+steps:
+  fastq_qc: true
+  trimming: true
+  alignment: true
+  mark_duplicates: true
+  bam_filter: true
+  bam_qc: true
+  coverage: true
+  peak_calling: true
+  frip: true
+  library_complexity: true
+  fragment_lengths: true
+  tss_enrichment: true
+  multiqc: true
+
+alignment:
+  tool: bowtie2
+
+filtering:
+  min_mapq: 10
+  excluded_flags: 1804
+  keep_duplicates: false
+  exclude_contigs:
+    - chrM
+    - MT
+
+coverage:
+  tool: deeptools
+  rna_strand_mode: none
+
+resources:
+  fastqc:
+    threads: 1
+    mem_mb: 512
+    runtime_min: 15
+  cutadapt:
+    threads: 2
+    mem_mb: 1024
+    runtime_min: 30
+  bowtie2:
+    threads: 2
+    mem_mb: 2048
+    runtime_min: 60
+  bowtie2_index:
+    threads: 2
+    mem_mb: 2048
+    runtime_min: 60
+  samtools_markdup:
+    threads: 2
+    mem_mb: 1024
+    runtime_min: 30
+  samtools_filter:
+    threads: 2
+    mem_mb: 1024
+    runtime_min: 30
+  samtools_qc:
+    threads: 1
+    mem_mb: 512
+    runtime_min: 15
+  deeptools:
+    threads: 2
+    mem_mb: 1024
+    runtime_min: 30
+  macs2:
+    threads: 1
+    mem_mb: 1024
+    runtime_min: 30
+  atac_frip:
+    threads: 1
+    mem_mb: 512
+    runtime_min: 15
+  atac_library_complexity:
+    threads: 1
+    mem_mb: 512
+    runtime_min: 15
+  atac_fragment_lengths:
+    threads: 1
+    mem_mb: 512
+    runtime_min: 15
+  atac_tss_enrichment:
+    threads: 1
+    mem_mb: 512
+    runtime_min: 15
+  multiqc:
+    threads: 1
+    mem_mb: 512
+    runtime_min: 15

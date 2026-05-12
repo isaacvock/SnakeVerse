@@ -32,6 +32,7 @@ jobs:
             bwa-mem2
             star
             samtools
+            bedtools
             subread
             deeptools
             multiqc
@@ -58,10 +59,13 @@ jobs:
           python config/bin/ngsflow.py list assays
           python config/bin/ngsflow.py list presets --assay generic
           python config/bin/ngsflow.py list presets --assay rnaseq
+          python config/bin/ngsflow.py list presets --assay atacseq
           python config/bin/ngsflow.py explain --configfile .test/configs/generic.yaml
           python config/bin/ngsflow.py validate --configfile .test/configs/generic.yaml
           python config/bin/ngsflow.py explain --configfile .test/configs/rnaseq.yaml
           python config/bin/ngsflow.py validate --configfile .test/configs/rnaseq.yaml
+          python config/bin/ngsflow.py explain --configfile .test/configs/atacseq.yaml
+          python config/bin/ngsflow.py validate --configfile .test/configs/atacseq.yaml
           python config/bin/ngsflow.py explain --configfile .test/configs/generic_bwa_mem2.yaml
           python config/bin/ngsflow.py validate --configfile .test/configs/generic_bwa_mem2.yaml
 
@@ -69,12 +73,14 @@ jobs:
         run: |
           snakemake --snakefile workflow/Snakefile --configfile .test/configs/generic.yaml --lint
           snakemake --snakefile workflow/Snakefile --configfile .test/configs/rnaseq.yaml --lint
+          snakemake --snakefile workflow/Snakefile --configfile .test/configs/atacseq.yaml --lint
           snakemake --snakefile workflow/Snakefile --configfile .test/configs/generic_bwa_mem2.yaml --lint
 
       - name: Snakemake dry-runs
         run: |
           snakemake --snakefile workflow/Snakefile --configfile .test/configs/generic.yaml --dry-run --cores 2 --printshellcmds
           snakemake --snakefile workflow/Snakefile --configfile .test/configs/rnaseq.yaml --dry-run --cores 2 --printshellcmds
+          snakemake --snakefile workflow/Snakefile --configfile .test/configs/atacseq.yaml --dry-run --cores 2 --printshellcmds
           snakemake --snakefile workflow/Snakefile --configfile .test/configs/generic_bwa_mem2.yaml --dry-run --cores 2 --printshellcmds
 
       - name: Full generic FASTQ-to-BAM run

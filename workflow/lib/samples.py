@@ -16,11 +16,20 @@ RNASEQ_REQUIRED_COLUMNS = [
     "replicate",
     "strandedness",
 ]
+ATACSEQ_REQUIRED_COLUMNS = [
+    "sample_id",
+    "unit_id",
+    "fastq_1",
+    "condition",
+    "replicate",
+]
 
 
 def required_columns_for_assay(assay: str) -> list[str]:
     if assay == "rnaseq":
         return RNASEQ_REQUIRED_COLUMNS
+    if assay == "atacseq":
+        return ATACSEQ_REQUIRED_COLUMNS
     return GENERIC_REQUIRED_COLUMNS
 
 
@@ -184,6 +193,26 @@ def bam_qc_targets(samples: list[dict[str, str]], results_dir: str) -> list[str]
 
 def bigwig_targets(samples: list[dict[str, str]], results_dir: str) -> list[str]:
     return [f"{results_dir}/tracks/bigwig/{sample}.bw" for sample in sample_ids(samples)]
+
+
+def narrowpeak_targets(samples: list[dict[str, str]], results_dir: str) -> list[str]:
+    return [f"{results_dir}/peaks/macs2/{sample}/{sample}_peaks.narrowPeak" for sample in sample_ids(samples)]
+
+
+def frip_targets(samples: list[dict[str, str]], results_dir: str) -> list[str]:
+    return [f"{results_dir}/qc/atac/{sample}.frip.txt" for sample in sample_ids(samples)]
+
+
+def library_complexity_targets(samples: list[dict[str, str]], results_dir: str) -> list[str]:
+    return [f"{results_dir}/qc/atac/{sample}.library_complexity.txt" for sample in sample_ids(samples)]
+
+
+def fragment_length_targets(samples: list[dict[str, str]], results_dir: str) -> list[str]:
+    return [f"{results_dir}/qc/atac/{sample}.fragment_lengths.txt" for sample in sample_ids(samples)]
+
+
+def tss_enrichment_targets(samples: list[dict[str, str]], results_dir: str) -> list[str]:
+    return [f"{results_dir}/qc/atac/{sample}.tss_enrichment.txt" for sample in sample_ids(samples)]
 
 
 def transcriptome_bam_targets(samples: list[dict[str, str]], results_dir: str) -> list[str]:

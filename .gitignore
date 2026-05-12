@@ -158,6 +158,7 @@ transcriptInfo.tab
 !.test/data/**/*.fasta
 !.test/data/**/*.gtf
 !.test/data/**/*.chrom.sizes
+!.test/data/**/*.bed
 
 ###############################################################################
 # Compressed/generated archives

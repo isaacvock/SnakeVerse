@@ -53,8 +53,16 @@ trimming_for_alignment = lambda: step_enabled("trimming", False)
 
 raw_bam_path = lambda sample: f"{RESULTS_DIR}/bam/raw/{sample}.bam"
 raw_bai_path = lambda sample: f"{RESULTS_DIR}/bam/raw/{sample}.bam.bai"
+markdup_bam_path = lambda sample: f"{RESULTS_DIR}/bam/markdup/{sample}.bam"
+markdup_bai_path = lambda sample: f"{RESULTS_DIR}/bam/markdup/{sample}.bam.bai"
 filtered_bam_path = lambda sample: f"{RESULTS_DIR}/bam/filtered/{sample}.bam"
 filtered_bai_path = lambda sample: f"{RESULTS_DIR}/bam/filtered/{sample}.bam.bai"
+pre_filter_bam_path = lambda sample: (
+    markdup_bam_path(sample) if step_enabled("mark_duplicates", False) else raw_bam_path(sample)
+)
+pre_filter_bai_path = lambda sample: (
+    markdup_bai_path(sample) if step_enabled("mark_duplicates", False) else raw_bai_path(sample)
+)
 final_bam_path = lambda sample: (
     filtered_bam_path(sample) if step_enabled("bam_filter", True) else raw_bam_path(sample)
 )
@@ -98,6 +106,7 @@ else:
     raise ValueError(f"Unsupported or missing alignment.tool: {ALIGNER}")
 
 include: str(WORKFLOW_DIR / "rules" / "common" / "bam_filter.smk")
+include: str(WORKFLOW_DIR / "rules" / "common" / "mark_duplicates.smk")
 include: str(WORKFLOW_DIR / "rules" / "common" / "bam_qc.smk")
 include: str(WORKFLOW_DIR / "rules" / "common" / "coverage.smk")
 include: str(WORKFLOW_DIR / "rules" / "common" / "multiqc.smk")
@@ -106,5 +115,7 @@ if config["assay"] == "generic":
     include: str(WORKFLOW_DIR / "rules" / "assays" / "generic.smk")
 elif config["assay"] == "rnaseq":
     include: str(WORKFLOW_DIR / "rules" / "assays" / "rnaseq.smk")
+elif config["assay"] == "atacseq":
+    include: str(WORKFLOW_DIR / "rules" / "assays" / "atacseq.smk")
 else:
     raise ValueError(f"Unsupported assay: {config['assay']}")

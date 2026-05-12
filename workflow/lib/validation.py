@@ -21,7 +21,7 @@ def validate_resolved_config(config: dict[str, Any], samples: list[dict[str, str
     warnings: list[str] = []
 
     assay = config.get("assay")
-    if assay not in {"generic", "rnaseq"}:
+    if assay not in {"generic", "rnaseq", "atacseq"}:
         errors.append(f"Unsupported assay: {assay}")
 
     for key in ("project", "samples", "results_dir"):
@@ -37,6 +37,8 @@ def validate_resolved_config(config: dict[str, Any], samples: list[dict[str, str
         required_tools.append(aligner)
     if assay == "rnaseq":
         required_tools.append("featurecounts")
+    if assay == "atacseq":
+        required_tools.extend(["macs2", "bedtools"])
     if config.get("steps", {}).get("coverage", False):
         required_tools.append("deeptools")
     for tool in sorted(set(required_tools)):
@@ -65,8 +67,16 @@ def validate_resolved_config(config: dict[str, Any], samples: list[dict[str, str
         quant_mode = str(align_params.get("quantMode", ""))
         if "TranscriptomeSAM" not in quant_mode:
             errors.append("STAR transcriptome BAM output requires star.params.align.quantMode to include TranscriptomeSAM")
+    if assay == "atacseq":
+        replicate_values = {row.get("replicate") for row in samples if row.get("replicate")}
+        if len(replicate_values) < 2:
+            warnings.append("ENCODE ATAC-seq standards recommend two or more biological replicates")
+        if not genome.get("blacklist"):
+            warnings.append("ATAC-seq blacklist filtering is recommended; genome.blacklist is blank")
+        if config.get("outputs", {}).get("tss_enrichment", False) and not genome.get("tss_bed"):
+            errors.append("outputs.tss_enrichment requires genome.tss_bed")
 
-    for ref_key in ("fasta", "gtf", "chrom_sizes", "bowtie2_index", "star_index", "bwa_mem2_index"):
+    for ref_key in ("fasta", "gtf", "chrom_sizes", "blacklist", "tss_bed", "bowtie2_index", "star_index", "bwa_mem2_index"):
         value = genome.get(ref_key)
         if value:
             if not path_exists(config.get("_ngsflow", {}).get("project_root", "."), str(value)):

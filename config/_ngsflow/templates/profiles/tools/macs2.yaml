@@ -1,0 +1,20 @@
+# Editable MACS2 profile for ATAC-seq peak calling.
+tool: macs2
+version: "2.2"
+
+params:
+  callpeak:
+    # genome_size can be set here, or inherited from genome.macs2_genome_size
+    # or genome.effective_genome_size.
+    genome_size:
+    qvalue: 0.01
+    keep_dup: all
+    call_summits: true
+    # For single-end ATAC-seq, users often set nomodel, shift, and extsize
+    # after choosing a project-specific insertion-site strategy.
+    nomodel:
+    shift:
+    extsize:
+
+# Appended verbatim to the MACS2 callpeak command.
+extra: ""

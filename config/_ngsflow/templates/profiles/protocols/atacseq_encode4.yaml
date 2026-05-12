@@ -1,0 +1,94 @@
+# ENCODE4-oriented ATAC-seq protocol profile.
+# This is a practical first-pass implementation: alignment, duplicate marking,
+# mapQ/mitochondrial/blacklist filtering, signal, MACS2 peaks, and QC metrics.
+# Full replicated IDR peak selection is intentionally not implemented yet.
+steps:
+  fastq_qc: true
+  trimming: true
+  alignment: true
+  mark_duplicates: true
+  bam_filter: true
+  bam_qc: true
+  coverage: true
+  peak_calling: true
+  frip: true
+  library_complexity: true
+  fragment_lengths: true
+  tss_enrichment: false
+  multiqc: true
+
+alignment:
+  # ENCODE ATAC-seq uniform processing uses Bowtie2 for raw alignments.
+  tool: bowtie2
+
+filtering:
+  # ENCODE standards emphasize high-quality, non-duplicate, non-mitochondrial reads.
+  min_mapq: 30
+  excluded_flags: 1804
+  keep_duplicates: false
+  # Remove mitochondrial reads after alignment. Add genome-specific aliases if needed.
+  exclude_contigs:
+    - chrM
+    - MT
+
+coverage:
+  tool: deeptools
+  rna_strand_mode: none
+
+resources:
+  fastqc:
+    threads: 1
+    mem_mb: 1024
+    runtime_min: 30
+  cutadapt:
+    threads: 4
+    mem_mb: 4096
+    runtime_min: 120
+  bowtie2:
+    threads: 8
+    mem_mb: 8192
+    runtime_min: 240
+  bowtie2_index:
+    threads: 4
+    mem_mb: 8192
+    runtime_min: 240
+  samtools_markdup:
+    threads: 4
+    mem_mb: 4096
+    runtime_min: 120
+  samtools_filter:
+    threads: 4
+    mem_mb: 4096
+    runtime_min: 120
+  samtools_qc:
+    threads: 2
+    mem_mb: 2048
+    runtime_min: 60
+  deeptools:
+    threads: 4
+    mem_mb: 4096
+    runtime_min: 120
+  macs2:
+    threads: 1
+    mem_mb: 4096
+    runtime_min: 120
+  atac_frip:
+    threads: 1
+    mem_mb: 1024
+    runtime_min: 30
+  atac_library_complexity:
+    threads: 1
+    mem_mb: 1024
+    runtime_min: 30
+  atac_fragment_lengths:
+    threads: 1
+    mem_mb: 1024
+    runtime_min: 30
+  atac_tss_enrichment:
+    threads: 1
+    mem_mb: 1024
+    runtime_min: 30
+  multiqc:
+    threads: 1
+    mem_mb: 2048
+    runtime_min: 60

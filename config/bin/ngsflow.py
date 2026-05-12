@@ -185,6 +185,8 @@ def required_sample_columns(assay: str) -> list[str]:
             "replicate",
             "strandedness",
         ]
+    if assay == "atacseq":
+        return ["sample_id", "unit_id", "fastq_1", "condition", "replicate"]
     return ["sample_id", "unit_id", "fastq_1"]
 
 
@@ -395,6 +397,8 @@ def validation_messages(config: dict[str, Any]) -> tuple[list[str], list[str]]:
         required_tools.append(aligner)
     if config.get("assay") == "rnaseq":
         required_tools.append("featurecounts")
+    if config.get("assay") == "atacseq":
+        required_tools.extend(["bedtools", "macs2"])
     if (config.get("steps") or {}).get("coverage", False):
         required_tools.append("deeptools")
     missing_tools = [
@@ -415,6 +419,14 @@ def validation_messages(config: dict[str, Any]) -> tuple[list[str], list[str]]:
         errors.append(f"Genome profile must define genome.fasta when building a {aligner} index")
     if config.get("assay") == "rnaseq" and not genome.get("gtf"):
         errors.append("Genome profile must define genome.gtf for RNA-seq runs")
+    if config.get("assay") == "atacseq":
+        replicate_values = {row.get("replicate") for row in rows if row.get("replicate")}
+        if len(replicate_values) < 2:
+            warnings.append("ENCODE ATAC-seq standards recommend two or more biological replicates")
+        if not genome.get("blacklist"):
+            warnings.append("ATAC-seq blacklist filtering is recommended; genome.blacklist is blank")
+        if config.get("outputs", {}).get("tss_enrichment", False) and not genome.get("tss_bed"):
+            errors.append("outputs.tss_enrichment requires genome.tss_bed")
     if config.get("outputs", {}).get("transcriptome_bam", False):
         if aligner != "star":
             errors.append("outputs.transcriptome_bam requires alignment.tool: star")
@@ -424,7 +436,7 @@ def validation_messages(config: dict[str, Any]) -> tuple[list[str], list[str]]:
         if "TranscriptomeSAM" not in quant_mode:
             errors.append("STAR transcriptome BAM output requires star.params.align.quantMode to include TranscriptomeSAM")
 
-    for key in ("fasta", "gtf", "chrom_sizes", "bowtie2_index", "star_index", "bwa_mem2_index"):
+    for key in ("fasta", "gtf", "chrom_sizes", "blacklist", "tss_bed", "bowtie2_index", "star_index", "bwa_mem2_index"):
         value = genome.get(key)
         if value and not project_path(str(value), project_root).exists():
             warnings.append(f"Reference path for genome.{key} does not exist yet: {value}")
