@@ -1,0 +1,7 @@
+# Assay-level defaults for generic FASTQ-to-BAM runs.
+assay_profile:
+  name: generic
+  description: "Assay-agnostic preprocessing, alignment, BAM QC, and optional tracks."
+
+sample_schema: config/_ngsflow/schemas/samples.generic.schema.yaml
+

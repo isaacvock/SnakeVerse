@@ -1,0 +1,28 @@
+# SnakeVerse run config for a generic FASTQ-to-BAM run.
+# This file is copied to config/runs/<run-name>.yaml by config/bin/ngsflow.py.
+project:
+  name: example_project
+  run_name: "{{RUN_NAME}}"
+
+assay: generic
+preset: fastq_to_bam
+
+# Edit this sample sheet after initialization.
+samples: config/samples/{{RUN_NAME}}.tsv
+
+# Profiles are merged in listed order. Later profiles override earlier profiles.
+profile_stack:
+  - config/profiles/assays/generic.yaml
+  - config/profiles/protocols/fastq_to_bam.yaml
+  - config/profiles/genomes/{{GENOME}}.yaml
+
+results_dir: results/{{RUN_NAME}}
+
+outputs:
+  fastq_qc: true
+  trimmed_fastq: true
+  raw_bam: true
+  filtered_bam: true
+  bigwig: true
+  multiqc: true
+

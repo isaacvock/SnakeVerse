@@ -1,0 +1,10 @@
+# Editable MultiQC profile.
+tool: multiqc
+version: "1.25"
+
+params:
+  force: true
+
+# Appended verbatim to the MultiQC command.
+extra: ""
+

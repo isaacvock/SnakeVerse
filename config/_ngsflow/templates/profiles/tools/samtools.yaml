@@ -1,0 +1,16 @@
+# Editable samtools profile.
+tool: samtools
+version: "1.20"
+
+params:
+  sort:
+    memory_per_thread: 2G
+  filter:
+    min_mapq: 10
+    required_flags:
+    excluded_flags: 1804
+    keep_duplicates: true
+
+# Appended verbatim to samtools view in the filtering rule.
+extra: ""
+

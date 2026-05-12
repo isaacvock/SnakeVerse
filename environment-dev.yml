@@ -1,0 +1,31 @@
+# environment-dev.yml
+name: snakeverse-dev
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - python=3.12
+  - snakemake
+  - snakedeploy
+  - pyyaml
+  - jsonschema
+  - pandas
+  - pytest
+  - pytest-cov
+  - ruff
+  - black
+  - snakefmt
+  - yamllint
+  - shellcheck
+  - graphviz
+
+  # Bioinformatics tools useful for local smoke tests.
+  # The real workflow should still use per-rule conda envs.
+  - fastqc
+  - cutadapt
+  - bowtie2
+  - star
+  - samtools
+  - subread
+  - deeptools
+  - multiqc

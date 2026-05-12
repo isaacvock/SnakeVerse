@@ -1,0 +1,46 @@
+assays:
+  generic:
+    description: "Generic FASTQ-to-BAM workflow for custom assays."
+    presets:
+      fastq_to_bam:
+        description: "Vanilla preprocessing, alignment, BAM filtering, optional tracks."
+        run_template: runs/generic_fastq_to_bam.yaml
+        sample_template: samples/generic.tsv
+        profiles:
+          assays:
+            - generic.yaml
+          protocols:
+            - fastq_to_bam.yaml
+          tools:
+            - fastqc.yaml
+            - cutadapt.yaml
+            - bowtie2.yaml
+            - samtools.yaml
+            - deeptools.yaml
+            - multiqc.yaml
+          genomes:
+            - hg38.yaml
+
+  rnaseq:
+    description: "Bulk RNA-seq workflow."
+    presets:
+      star_featurecounts:
+        description: "STAR alignment plus featureCounts gene quantification."
+        run_template: runs/rnaseq_star_featurecounts.yaml
+        sample_template: samples/rnaseq.tsv
+        profiles:
+          assays:
+            - rnaseq.yaml
+          protocols:
+            - rnaseq_star_featurecounts.yaml
+          tools:
+            - fastqc.yaml
+            - cutadapt.yaml
+            - star.yaml
+            - samtools.yaml
+            - featurecounts.yaml
+            - deeptools.yaml
+            - multiqc.yaml
+          genomes:
+            - hg38.yaml
+

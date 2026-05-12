@@ -1,0 +1,11 @@
+# Example hg38 genome profile.
+# Replace these paths with local reference FASTA/GTF/index locations.
+genome:
+  name: hg38
+  fasta: resources/genomes/hg38/hg38.fa
+  chrom_sizes: resources/genomes/hg38/hg38.chrom.sizes
+  gtf: resources/genomes/hg38/gencode.annotation.gtf
+  bowtie2_index: resources/genomes/hg38/bowtie2/hg38
+  star_index: resources/genomes/hg38/star
+  effective_genome_size: 2913022398
+

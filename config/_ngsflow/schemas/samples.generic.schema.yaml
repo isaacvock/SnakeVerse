@@ -1,0 +1,17 @@
+title: "SnakeVerse generic sample sheet"
+type: object
+required_columns:
+  - sample_id
+  - unit_id
+  - fastq_1
+  - fastq_2
+columns:
+  sample_id:
+    description: "Biological sample identifier."
+  unit_id:
+    description: "Sequencing unit or lane identifier."
+  fastq_1:
+    description: "Path to R1 FASTQ, relative to the project root or absolute."
+  fastq_2:
+    description: "Path to R2 FASTQ, relative to the project root or absolute."
+

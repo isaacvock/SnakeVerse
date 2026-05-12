@@ -1,0 +1,13 @@
+# Assay-level defaults for bulk RNA-seq runs.
+assay_profile:
+  name: rnaseq
+  description: "Bulk RNA-seq alignment and gene-level counting."
+
+sample_schema: config/_ngsflow/schemas/samples.rnaseq.schema.yaml
+
+rnaseq:
+  strandedness_values:
+    - unstranded
+    - forward
+    - reverse
+

@@ -1,0 +1,35 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+title: "SnakeVerse run config"
+type: object
+required:
+  - project
+  - assay
+  - preset
+  - samples
+  - profile_stack
+  - results_dir
+properties:
+  project:
+    type: object
+    required: [name, run_name]
+    properties:
+      name:
+        type: string
+      run_name:
+        type: string
+  assay:
+    type: string
+  preset:
+    type: string
+  samples:
+    type: string
+  profile_stack:
+    type: array
+    items:
+      type: string
+  results_dir:
+    type: string
+  outputs:
+    type: object
+additionalProperties: true
+

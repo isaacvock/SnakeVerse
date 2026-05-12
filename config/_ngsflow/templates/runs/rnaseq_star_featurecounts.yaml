@@ -1,0 +1,29 @@
+# SnakeVerse run config for bulk RNA-seq with STAR and featureCounts.
+# This file is copied to config/runs/<run-name>.yaml by config/bin/ngsflow.py.
+project:
+  name: example_project
+  run_name: "{{RUN_NAME}}"
+
+assay: rnaseq
+preset: star_featurecounts
+
+# Edit this sample sheet after initialization.
+samples: config/samples/{{RUN_NAME}}.tsv
+
+# Profiles are merged in listed order. Later profiles override earlier profiles.
+profile_stack:
+  - config/profiles/assays/rnaseq.yaml
+  - config/profiles/protocols/rnaseq_star_featurecounts.yaml
+  - config/profiles/genomes/{{GENOME}}.yaml
+
+results_dir: results/{{RUN_NAME}}
+
+outputs:
+  fastq_qc: true
+  trimmed_fastq: true
+  raw_bam: true
+  filtered_bam: true
+  gene_counts: true
+  bigwig: true
+  multiqc: true
+

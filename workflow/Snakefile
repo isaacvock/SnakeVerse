@@ -1,0 +1,134 @@
+from pathlib import Path
+import sys
+
+configfile: "config/config.yaml"
+
+try:
+    WORKFLOW_DIR = Path(workflow.basedir).resolve()
+except AttributeError:
+    WORKFLOW_DIR = Path("workflow").resolve()
+
+sys.path.insert(0, str(WORKFLOW_DIR / "lib"))
+
+from config import get_results_dir, resolve_config
+from samples import (
+    alignment_fastq_1,
+    alignment_fastq_2,
+    bam_qc_targets,
+    bigwig_targets,
+    filtered_bam_targets,
+    fastqc_targets,
+    load_samples,
+    raw_bam_targets,
+    sample_ids,
+    trimmed_fastq_targets,
+)
+from validation import validate_resolved_config
+
+
+try:
+    CONFIGFILES = list(workflow.configfiles)
+except AttributeError:
+    CONFIGFILES = []
+
+CONFIGFILE = CONFIGFILES[-1] if CONFIGFILES else "config/config.yaml"
+RESOLVED_CONFIG = resolve_config(CONFIGFILE)
+config.update(RESOLVED_CONFIG)
+
+RESULTS_DIR = get_results_dir(config)
+PROJECT_ROOT = config["_ngsflow"]["project_root"]
+SAMPLES = load_samples(config["samples"], config["assay"], PROJECT_ROOT)
+SAMPLE_IDS = sample_ids(SAMPLES)
+
+VALIDATION_ERRORS, VALIDATION_WARNINGS = validate_resolved_config(config, SAMPLES)
+if VALIDATION_ERRORS:
+    raise ValueError(
+        "SnakeVerse config validation failed:\n  - "
+        + "\n  - ".join(VALIDATION_ERRORS)
+    )
+for warning in VALIDATION_WARNINGS:
+    print(f"SnakeVerse warning: {warning}")
+
+
+def output_enabled(name):
+    return bool(config.get("outputs", {}).get(name, False))
+
+
+def step_enabled(name, default=True):
+    return bool(config.get("steps", {}).get(name, default))
+
+
+def trimming_for_alignment():
+    return step_enabled("trimming", False)
+
+
+def raw_bam_path(sample):
+    return f"{RESULTS_DIR}/bam/raw/{sample}.bam"
+
+
+def raw_bai_path(sample):
+    return f"{RESULTS_DIR}/bam/raw/{sample}.bam.bai"
+
+
+def filtered_bam_path(sample):
+    return f"{RESULTS_DIR}/bam/filtered/{sample}.bam"
+
+
+def filtered_bai_path(sample):
+    return f"{RESULTS_DIR}/bam/filtered/{sample}.bam.bai"
+
+
+def final_bam_path(sample):
+    if step_enabled("bam_filter", True):
+        return filtered_bam_path(sample)
+    return raw_bam_path(sample)
+
+
+def final_bai_path(sample):
+    if step_enabled("bam_filter", True):
+        return filtered_bai_path(sample)
+    return raw_bai_path(sample)
+
+
+def alignment_r1(wildcards):
+    return alignment_fastq_1(SAMPLES, wildcards.sample, RESULTS_DIR, trimming_for_alignment())
+
+
+def alignment_r2(wildcards):
+    return alignment_fastq_2(SAMPLES, wildcards.sample, RESULTS_DIR, trimming_for_alignment())
+
+
+ASSAY_TARGETS = []
+MULTIQC_INPUTS = []
+
+
+rule all:
+    input:
+        lambda wildcards: ASSAY_TARGETS
+
+
+include: str(WORKFLOW_DIR / "rules" / "common" / "fastq_qc.smk")
+
+if step_enabled("trimming", False):
+    include: str(WORKFLOW_DIR / "rules" / "common" / "trimming.smk")
+
+ALIGNER = config.get("alignment", {}).get("tool")
+if ALIGNER == "bowtie2":
+    include: str(WORKFLOW_DIR / "rules" / "common" / "align_bowtie2.smk")
+elif ALIGNER == "star":
+    include: str(WORKFLOW_DIR / "rules" / "common" / "align_star.smk")
+else:
+    raise ValueError(f"Unsupported or missing alignment.tool: {ALIGNER}")
+
+include: str(WORKFLOW_DIR / "rules" / "common" / "bam_filter.smk")
+include: str(WORKFLOW_DIR / "rules" / "common" / "bam_qc.smk")
+include: str(WORKFLOW_DIR / "rules" / "common" / "coverage.smk")
+include: str(WORKFLOW_DIR / "rules" / "common" / "multiqc.smk")
+
+if config["assay"] == "generic":
+    include: str(WORKFLOW_DIR / "rules" / "assays" / "generic.smk")
+elif config["assay"] == "rnaseq":
+    include: str(WORKFLOW_DIR / "rules" / "assays" / "rnaseq.smk")
+else:
+    raise ValueError(f"Unsupported assay: {config['assay']}")
+

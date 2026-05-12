@@ -1,0 +1,11 @@
+# Editable FastQC profile.
+tool: fastqc
+version: "0.12"
+
+params:
+  noextract: true
+  quiet: false
+
+# Appended verbatim to the FastQC command.
+extra: ""
+

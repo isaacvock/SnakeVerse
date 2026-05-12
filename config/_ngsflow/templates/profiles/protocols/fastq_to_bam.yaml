@@ -1,0 +1,46 @@
+# Protocol profile for a vanilla FASTQ-to-BAM workflow.
+steps:
+  fastq_qc: true
+  trimming: true
+  alignment: true
+  bam_filter: true
+  coverage: true
+  multiqc: true
+
+alignment:
+  tool: bowtie2
+
+coverage:
+  tool: deeptools
+  rna_strand_mode: none
+
+resources:
+  fastqc:
+    threads: 1
+    mem_mb: 1024
+    runtime_min: 30
+  cutadapt:
+    threads: 4
+    mem_mb: 4096
+    runtime_min: 120
+  bowtie2:
+    threads: 8
+    mem_mb: 8192
+    runtime_min: 240
+  samtools_filter:
+    threads: 4
+    mem_mb: 4096
+    runtime_min: 120
+  samtools_qc:
+    threads: 2
+    mem_mb: 2048
+    runtime_min: 60
+  deeptools:
+    threads: 4
+    mem_mb: 4096
+    runtime_min: 120
+  multiqc:
+    threads: 1
+    mem_mb: 2048
+    runtime_min: 60
+

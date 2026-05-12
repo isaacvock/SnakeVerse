@@ -1,0 +1,6 @@
+# Active SnakeVerse run pointer.
+# Create or switch active runs with:
+#   python config/bin/ngsflow.py init-run --assay generic --preset fastq_to_bam --genome hg38 --run-name generic
+#   python config/bin/ngsflow.py activate-run generic
+run_config: config/runs/generic.yaml
+

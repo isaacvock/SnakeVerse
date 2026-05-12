@@ -1,0 +1,13 @@
+# Editable Bowtie2 profile.
+tool: bowtie2
+version: "2.5"
+
+params:
+  sensitivity: "--very-sensitive"
+  max_insert_size: 1000
+  no_mixed: false
+  no_discordant: false
+
+# Appended verbatim to the Bowtie2 command.
+extra: ""
+
