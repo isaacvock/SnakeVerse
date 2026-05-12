@@ -101,3 +101,18 @@ jobs:
             --printshellcmds \
             --show-failed-logs \
             --latency-wait 30
+
+      - name: Full ATAC-seq run
+        run: |
+          snakemake --snakefile workflow/Snakefile \
+            --configfile .test/configs/atacseq.yaml \
+            --cores 2 \
+            --printshellcmds \
+            --show-failed-logs \
+            --latency-wait 30
+          test -s .test/results/atacseq/bam/filtered/K562_ATAC_rep1.bam
+          test -s .test/results/atacseq/bam/filtered/K562_ATAC_rep2.bam
+          test -s .test/results/atacseq/qc/atac/K562_ATAC_rep1.frip.txt
+          test -s .test/results/atacseq/qc/atac/K562_ATAC_rep2.frip.txt
+          test -e .test/results/atacseq/peaks/macs3/K562_ATAC_rep1/K562_ATAC_rep1_peaks.narrowPeak
+          test -e .test/results/atacseq/peaks/macs3/K562_ATAC_rep2/K562_ATAC_rep2_peaks.narrowPeak

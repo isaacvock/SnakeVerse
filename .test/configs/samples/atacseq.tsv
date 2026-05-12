@@ -1,4 +1,3 @@
 sample_id	unit_id	fastq_1	fastq_2	condition	replicate
-WT_1	L001	.test/data/WT1/WT1_test_R1.fastq.gz	.test/data/WT1/WT1_test_R2.fastq.gz	WT	1
-WT_2	L001	.test/data/WT2/WT2_test_R1.fastq.gz	.test/data/WT2/WT2_test_R2.fastq.gz	WT	2
-
+K562_ATAC_rep1	ENCFF490USC	.test/data/ATACseq/ENCFF490USC.chr21_R1.fastq.gz	.test/data/ATACseq/ENCFF490USC.chr21_R2.fastq.gz	K562	1
+K562_ATAC_rep2	ENCFF631ZTS	.test/data/ATACseq/ENCFF631ZTS.chr21_R1.fastq.gz	.test/data/ATACseq/ENCFF631ZTS.chr21_R2.fastq.gz	K562	2
