@@ -1,0 +1,12 @@
+tool: deeptools
+version: "3.5"
+
+params:
+  bin_size: 25
+  normalize_using: CPM
+  min_mapping_quality: 10
+  ignore_duplicates: false
+  extend_reads: false
+
+extra: ""
+

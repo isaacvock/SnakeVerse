@@ -149,6 +149,14 @@ sjdbList.fromGTF.out.tab
 sjdbList.out.tab
 transcriptInfo.tab
 
+# Keep the small CI fixture tracked even though real NGS data is ignored.
+!.test/data/
+!.test/data/**/
+!.test/data/**/*.fastq.gz
+!.test/data/**/*.fasta
+!.test/data/**/*.gtf
+!.test/data/**/*.chrom.sizes
+
 ###############################################################################
 # Compressed/generated archives
 ###############################################################################

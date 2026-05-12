@@ -1,0 +1,6 @@
+assay_profile:
+  name: generic
+  description: "CI generic FASTQ-to-BAM profile."
+
+sample_schema: config/_ngsflow/schemas/samples.generic.schema.yaml
+

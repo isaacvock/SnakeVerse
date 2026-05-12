@@ -1,0 +1,12 @@
+assay_profile:
+  name: rnaseq
+  description: "CI RNA-seq profile."
+
+sample_schema: config/_ngsflow/schemas/samples.rnaseq.schema.yaml
+
+rnaseq:
+  strandedness_values:
+    - unstranded
+    - forward
+    - reverse
+

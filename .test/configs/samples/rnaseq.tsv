@@ -1,0 +1,5 @@
+sample_id	unit_id	fastq_1	fastq_2	condition	replicate	strandedness
+WT_1	L001	.test/data/WT1/WT1_test_R1.fastq.gz	.test/data/WT1/WT1_test_R2.fastq.gz	WT	1	reverse
+WT_2	L001	.test/data/WT2/WT2_test_R1.fastq.gz	.test/data/WT2/WT2_test_R2.fastq.gz	WT	2	reverse
+WT_ctl	L001	.test/data/WTctl/WTctl_test_R1.fastq.gz	.test/data/WTctl/WTctl_test_R2.fastq.gz	WT_ctl	1	reverse
+

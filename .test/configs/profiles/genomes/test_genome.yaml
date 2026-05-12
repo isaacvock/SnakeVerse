@@ -1,0 +1,9 @@
+genome:
+  name: chr21_test
+  fasta: .test/data/genome/genome.fasta
+  chrom_sizes: .test/data/genome/genome.chrom.sizes
+  gtf: .test/data/annotation/genome.gtf
+  bowtie2_index: .test/data/indexes/bowtie2/genome
+  star_index: .test/data/indexes/star
+  effective_genome_size: 46709983
+

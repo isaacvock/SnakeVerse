@@ -1,0 +1,24 @@
+project:
+  name: snakeverse_ci
+  run_name: generic
+
+assay: generic
+preset: fastq_to_bam
+
+samples: .test/configs/samples/generic.tsv
+
+profile_stack:
+  - .test/configs/profiles/assays/generic.yaml
+  - .test/configs/profiles/protocols/fastq_to_bam.yaml
+  - .test/configs/profiles/genomes/test_genome.yaml
+
+results_dir: .test/results/generic
+
+outputs:
+  fastq_qc: true
+  trimmed_fastq: true
+  raw_bam: true
+  filtered_bam: true
+  bigwig: true
+  multiqc: true
+

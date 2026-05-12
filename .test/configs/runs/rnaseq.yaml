@@ -1,0 +1,25 @@
+project:
+  name: snakeverse_ci
+  run_name: rnaseq
+
+assay: rnaseq
+preset: star_featurecounts
+
+samples: .test/configs/samples/rnaseq.tsv
+
+profile_stack:
+  - .test/configs/profiles/assays/rnaseq.yaml
+  - .test/configs/profiles/protocols/rnaseq_star_featurecounts.yaml
+  - .test/configs/profiles/genomes/test_genome.yaml
+
+results_dir: .test/results/rnaseq
+
+outputs:
+  fastq_qc: true
+  trimmed_fastq: true
+  raw_bam: true
+  filtered_bam: true
+  gene_counts: true
+  bigwig: true
+  multiqc: true
+

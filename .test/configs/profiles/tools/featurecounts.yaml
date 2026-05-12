@@ -1,0 +1,14 @@
+tool: featurecounts
+version: "subread"
+
+params:
+  feature_type: exon
+  attribute_type: gene_id
+  strand: 2
+  paired_end: true
+  require_both_ends_mapped: false
+  count_multimapping_reads: false
+  count_overlapping_features: false
+
+extra: ""
+

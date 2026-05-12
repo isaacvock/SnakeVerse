@@ -1,0 +1,8 @@
+tool: multiqc
+version: "1.25"
+
+params:
+  force: true
+
+extra: ""
+

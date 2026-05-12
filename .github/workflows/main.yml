@@ -1,0 +1,65 @@
+name: Tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  unit-tests:
+    name: Config, lint, and dry-run tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -el {0}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Snakemake test environment
+        uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-name: snakeverse-ci
+          create-args: >-
+            python=3.12
+            snakemake
+            pyyaml
+          condarc: |
+            channels:
+              - conda-forge
+              - bioconda
+            channel_priority: strict
+          cache-environment: true
+
+      - name: Python syntax checks
+        run: |
+          python -m py_compile \
+            config/bin/ngsflow.py \
+            workflow/lib/config.py \
+            workflow/lib/params.py \
+            workflow/lib/samples.py \
+            workflow/lib/tracks.py \
+            workflow/lib/validation.py
+
+      - name: Helper script checks
+        run: |
+          python config/bin/ngsflow.py list assays
+          python config/bin/ngsflow.py list presets --assay generic
+          python config/bin/ngsflow.py list presets --assay rnaseq
+          python config/bin/ngsflow.py explain --configfile .test/configs/generic.yaml
+          python config/bin/ngsflow.py validate --configfile .test/configs/generic.yaml
+          python config/bin/ngsflow.py explain --configfile .test/configs/rnaseq.yaml
+          python config/bin/ngsflow.py validate --configfile .test/configs/rnaseq.yaml
+
+      - name: Snakemake lint
+        run: |
+          snakemake --snakefile workflow/Snakefile --configfile .test/configs/generic.yaml --lint
+          snakemake --snakefile workflow/Snakefile --configfile .test/configs/rnaseq.yaml --lint
+
+      - name: Snakemake dry-runs
+        run: |
+          snakemake --snakefile workflow/Snakefile --configfile .test/configs/generic.yaml --dry-run --cores 2 --printshellcmds
+          snakemake --snakefile workflow/Snakefile --configfile .test/configs/rnaseq.yaml --dry-run --cores 2 --printshellcmds
+

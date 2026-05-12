@@ -1,0 +1,50 @@
+steps:
+  fastq_qc: true
+  trimming: true
+  alignment: true
+  bam_filter: true
+  coverage: true
+  gene_counts: true
+  multiqc: true
+
+alignment:
+  tool: star
+
+coverage:
+  tool: deeptools
+  rna_strand_mode: sample
+
+resources:
+  fastqc:
+    threads: 1
+    mem_mb: 512
+    runtime_min: 15
+  cutadapt:
+    threads: 2
+    mem_mb: 1024
+    runtime_min: 30
+  star:
+    threads: 2
+    mem_mb: 4096
+    runtime_min: 90
+  samtools_filter:
+    threads: 2
+    mem_mb: 1024
+    runtime_min: 30
+  samtools_qc:
+    threads: 1
+    mem_mb: 512
+    runtime_min: 15
+  featurecounts:
+    threads: 2
+    mem_mb: 1024
+    runtime_min: 30
+  deeptools:
+    threads: 2
+    mem_mb: 1024
+    runtime_min: 30
+  multiqc:
+    threads: 1
+    mem_mb: 512
+    runtime_min: 15
+

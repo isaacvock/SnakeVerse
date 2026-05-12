@@ -154,7 +154,7 @@ def resolve_config(configfile: str | Path) -> dict[str, Any]:
         resolved = deep_merge(resolved, profile)
         loaded_profiles.append(display_path(profile_path, project_root))
 
-    tools_dir = project_root / "config" / "profiles" / "tools"
+    tools_dir = config_path.parent / "profiles" / "tools"
     tools: dict[str, dict[str, Any]] = {}
     if tools_dir.exists():
         for tool_path in sorted(tools_dir.glob("*.yaml")):

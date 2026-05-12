@@ -1,0 +1,3 @@
+# CI pointer config for the RNA-seq STAR + featureCounts stack.
+run_config: .test/configs/runs/rnaseq.yaml
+
