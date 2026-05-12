@@ -10,7 +10,7 @@ except AttributeError:
 
 sys.path.insert(0, str(WORKFLOW_DIR / "lib"))
 
-from config import get_results_dir, resolve_config
+from config import get_results_dir, resolve_config_from_mapping
 from samples import (
     alignment_fastq_1,
     alignment_fastq_2,
@@ -26,13 +26,7 @@ from samples import (
 from validation import validate_resolved_config
 
 
-try:
-    CONFIGFILES = list(workflow.configfiles)
-except AttributeError:
-    CONFIGFILES = []
-
-CONFIGFILE = CONFIGFILES[-1] if CONFIGFILES else "config/config.yaml"
-RESOLVED_CONFIG = resolve_config(CONFIGFILE)
+RESOLVED_CONFIG = resolve_config_from_mapping(config)
 config.update(RESOLVED_CONFIG)
 
 RESULTS_DIR = get_results_dir(config)
@@ -131,4 +125,3 @@ elif config["assay"] == "rnaseq":
     include: str(WORKFLOW_DIR / "rules" / "assays" / "rnaseq.smk")
 else:
     raise ValueError(f"Unsupported assay: {config['assay']}")
-

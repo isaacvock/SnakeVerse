@@ -62,6 +62,12 @@ def _display_project_path(path: Path, project_root: Path) -> str:
         return path.as_posix()
 
 
+def _config_root_from_run_config(run_config_path: Path) -> Path:
+    if run_config_path.parent.name == "runs":
+        return run_config_path.parent.parent
+    return run_config_path.parent
+
+
 def load_profile_stack(
     run_config: dict[str, Any], project_root: str | Path
 ) -> list[tuple[Path, dict[str, Any]]]:
@@ -92,23 +98,46 @@ def resolve_config(configfile: str | Path) -> dict[str, Any]:
     """Resolve the pointer config, profile stack, tool profiles, and run config."""
     project_root = _project_root_from_configfile(configfile)
     config_path = _resolve_project_path(configfile, project_root)
-    config_root = config_path.parent
-
     pointer_config = load_yaml(config_path)
+    return resolve_config_from_mapping(
+        pointer_config,
+        project_root=project_root,
+        configfile_label=_display_project_path(config_path, project_root),
+        fallback_config_root=config_path.parent,
+    )
+
+
+def resolve_config_from_mapping(
+    pointer_config: dict[str, Any],
+    project_root: str | Path | None = None,
+    configfile_label: str = "<snakemake config>",
+    fallback_config_root: str | Path | None = None,
+) -> dict[str, Any]:
+    """Resolve config from Snakemake's merged config mapping.
+
+    Snakemake merges config files listed in a Snakefile with config files supplied
+    via ``--configfile``. This entry point honors the merged ``run_config`` value
+    instead of assuming the Snakefile's default configfile is the active pointer.
+    """
+    root = Path(project_root).resolve() if project_root else Path.cwd().resolve()
+
     run_config_value = pointer_config.get("run_config")
     if not run_config_value:
-        raise ConfigError(
-            f"{_display_project_path(config_path, project_root)} must define run_config"
-        )
+        raise ConfigError(f"{configfile_label} must define run_config")
 
-    run_config_path = _resolve_project_path(run_config_value, project_root)
+    run_config_path = _resolve_project_path(run_config_value, root)
     run_config = load_yaml(run_config_path)
+    config_root = (
+        Path(fallback_config_root)
+        if fallback_config_root is not None
+        else _config_root_from_run_config(run_config_path)
+    )
 
     resolved: dict[str, Any] = {}
     loaded_profiles: list[str] = []
-    for profile_path, profile in load_profile_stack(run_config, project_root):
+    for profile_path, profile in load_profile_stack(run_config, root):
         resolved = deep_merge(resolved, profile)
-        loaded_profiles.append(_display_project_path(profile_path, project_root))
+        loaded_profiles.append(_display_project_path(profile_path, root))
 
     tool_profiles = load_tool_profiles(config_root)
     resolved = deep_merge(resolved, {"tools": tool_profiles})
@@ -116,9 +145,9 @@ def resolve_config(configfile: str | Path) -> dict[str, Any]:
     resolved = deep_merge(resolved, run_config)
 
     resolved["_ngsflow"] = {
-        "project_root": project_root.as_posix(),
-        "configfile": _display_project_path(config_path, project_root),
-        "run_config": _display_project_path(run_config_path, project_root),
+        "project_root": root.as_posix(),
+        "configfile": configfile_label,
+        "run_config": _display_project_path(run_config_path, root),
         "loaded_profiles": loaded_profiles,
         "loaded_tool_profiles": sorted(tool_profiles),
     }
@@ -140,4 +169,3 @@ def write_resolved_config(resolved_config: dict[str, Any], results_dir: str | Pa
     with outpath.open("w", encoding="utf-8") as handle:
         yaml.safe_dump(resolved_config, handle, sort_keys=False)
     return outpath
-
