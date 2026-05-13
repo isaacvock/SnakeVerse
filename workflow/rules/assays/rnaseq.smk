@@ -1,20 +1,5 @@
-from params import render_featurecounts, render_tool_params, resource_value, tool_extra
-from samples import featurecounts_count_read_pairs, featurecounts_paired_end, sample_layout
-
-
-def featurecounts_rendered(overrides=None, drop_keys=None):
-    params = dict(config.get("tools", {}).get("featurecounts", {}).get("params", {}) or {})
-    for key in drop_keys or []:
-        params.pop(key, None)
-    params.update(
-        {
-            "paired_end": featurecounts_paired_end(SAMPLES, config),
-            "count_read_pairs": featurecounts_count_read_pairs(SAMPLES, config),
-        }
-    )
-    if overrides:
-        params.update(overrides)
-    return render_featurecounts(params)
+from params import render_featurecounts_for_config, render_tool_params, resource_value, tool_extra
+from samples import sample_layout
 
 
 RNASEQ_TARGETS = []
@@ -95,7 +80,7 @@ rule featurecounts:
         str(WORKFLOW_DIR / "envs" / "subread.yaml")
     params:
         annotation=lambda wildcards: config["genome"]["gtf"],
-        rendered=lambda wildcards: featurecounts_rendered(),
+        rendered=lambda wildcards: render_featurecounts_for_config(config, SAMPLES),
         extra=lambda wildcards: tool_extra(config, "featurecounts")
     shell:
         """
@@ -123,7 +108,9 @@ rule featurecounts_exon_strict:
         str(WORKFLOW_DIR / "envs" / "subread.yaml")
     params:
         annotation=lambda wildcards: config["genome"]["gtf"],
-        rendered=lambda wildcards: featurecounts_rendered(
+        rendered=lambda wildcards: render_featurecounts_for_config(
+            config,
+            SAMPLES,
             overrides={"feature_type": "exon", "non_overlap": 0}
         ),
         extra=lambda wildcards: tool_extra(config, "featurecounts")
@@ -137,7 +124,8 @@ rule featurecounts_exon_strict:
 
 rule gene_regions_saf:
     input:
-        gtf=lambda wildcards: config["genome"]["gtf"]
+        gtf=lambda wildcards: config["genome"]["gtf"],
+        script=str(WORKFLOW_DIR / "scripts" / "gtf_to_gene_saf.py")
     output:
         saf=f"{RESULTS_DIR}/reference/annotation/{GENOME_SLUG}.gene_regions.saf"
     log:
@@ -147,7 +135,7 @@ rule gene_regions_saf:
     shell:
         """
         mkdir -p $(dirname {output.saf}) $(dirname {log})
-        python {WORKFLOW_DIR}/scripts/gtf_to_gene_saf.py \
+        python {input.script} \
             --gtf {input.gtf} --output {output.saf} > {log} 2>&1
         """
 
@@ -170,7 +158,9 @@ rule featurecounts_full_gene:
     conda:
         str(WORKFLOW_DIR / "envs" / "subread.yaml")
     params:
-        rendered=lambda wildcards: featurecounts_rendered(
+        rendered=lambda wildcards: render_featurecounts_for_config(
+            config,
+            SAMPLES,
             overrides={"annotation_format": "SAF"},
             drop_keys=("feature_type", "attribute_type"),
         ),

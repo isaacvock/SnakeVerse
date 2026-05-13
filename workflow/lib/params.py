@@ -4,6 +4,8 @@ import shlex
 from collections.abc import Mapping
 from typing import Any
 
+from samples import featurecounts_count_read_pairs, featurecounts_paired_end
+
 
 def _dash(name: str) -> str:
     return name.replace("_", "-")
@@ -182,6 +184,26 @@ def render_featurecounts(params: Mapping[str, Any]) -> str:
         flag = flag_map.get(key, f"--{_dash(key)}")
         _append_flag(parts, flag, value)
     return " ".join(parts)
+
+
+def render_featurecounts_for_config(
+    config: Mapping[str, Any],
+    samples: list[dict[str, str]],
+    overrides: Mapping[str, Any] | None = None,
+    drop_keys: tuple[str, ...] = (),
+) -> str:
+    params = dict(config.get("tools", {}).get("featurecounts", {}).get("params", {}) or {})
+    for key in drop_keys:
+        params.pop(key, None)
+    params.update(
+        {
+            "paired_end": featurecounts_paired_end(samples, config),
+            "count_read_pairs": featurecounts_count_read_pairs(samples, config),
+        }
+    )
+    if overrides:
+        params.update(overrides)
+    return render_featurecounts(params)
 
 
 def render_salmon(params: Mapping[str, Any]) -> str:
