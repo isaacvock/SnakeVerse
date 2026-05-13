@@ -8,6 +8,10 @@ steps:
   coverage: true
   multiqc: true
 
+trimming:
+  # Set to fastp or cutadapt.
+  tool: fastp
+
 alignment:
   tool: bowtie2
 
@@ -20,10 +24,18 @@ resources:
     threads: 1
     mem_mb: 1024
     runtime_min: 30
+  fastp:
+    threads: 4
+    mem_mb: 4096
+    runtime_min: 120
   cutadapt:
     threads: 4
     mem_mb: 4096
     runtime_min: 120
+  sra_tools:
+    threads: 4
+    mem_mb: 4096
+    runtime_min: 240
   bowtie2:
     threads: 8
     mem_mb: 8192

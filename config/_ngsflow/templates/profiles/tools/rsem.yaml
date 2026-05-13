@@ -1,0 +1,11 @@
+# Editable RSEM profile.
+tool: rsem
+version: "1"
+
+params:
+  prepare_reference: {}
+  quant: {}
+
+# Appended verbatim to RSEM commands.
+extra: ""
+

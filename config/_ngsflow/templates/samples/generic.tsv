@@ -1,3 +1,4 @@
-sample_id	unit_id	fastq_1	fastq_2
-sample1	L001	fastq/sample1_R1.fastq.gz	fastq/sample1_R2.fastq.gz
+sample_id	unit_id	fastq_1	fastq_2	sra_id	sra_layout
+sample1	L001	fastq/sample1_R1.fastq.gz	fastq/sample1_R2.fastq.gz		
 # For single-end data, leave fastq_2 blank.
+# To download from SRA, set sra_id and leave fastq_1/fastq_2 blank. Use sra_layout=paired for paired-end SRA runs.

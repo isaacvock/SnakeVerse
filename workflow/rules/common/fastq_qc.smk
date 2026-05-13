@@ -4,7 +4,7 @@ from samples import fastq_for_read
 
 rule fastqc:
     input:
-        lambda wildcards: fastq_for_read(SAMPLES, wildcards.unit, wildcards.read)
+        lambda wildcards: fastq_for_read(SAMPLES, wildcards.unit, wildcards.read, RESULTS_DIR)
     output:
         directory(f"{RESULTS_DIR}/qc/fastqc/{{unit}}.{{read}}")
     log:

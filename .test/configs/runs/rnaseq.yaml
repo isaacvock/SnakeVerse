@@ -21,6 +21,12 @@ outputs:
   filtered_bam: true
   bam_qc: true
   gene_counts: true
+  exon_strict_counts: true
+  full_gene_counts: true
   transcriptome_bam: true
+  salmon_gene_quant: true
+  salmon_isoform_quant: true
+  rsem_gene_quant: false
+  rsem_isoform_quant: false
   bigwig: true
   multiqc: true

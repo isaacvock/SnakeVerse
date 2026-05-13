@@ -8,6 +8,9 @@ steps:
   gene_counts: true
   multiqc: true
 
+trimming:
+  tool: fastp
+
 alignment:
   tool: star
 
@@ -20,10 +23,18 @@ resources:
     threads: 1
     mem_mb: 512
     runtime_min: 15
+  fastp:
+    threads: 2
+    mem_mb: 1024
+    runtime_min: 30
   cutadapt:
     threads: 2
     mem_mb: 1024
     runtime_min: 30
+  sra_tools:
+    threads: 2
+    mem_mb: 1024
+    runtime_min: 60
   star:
     threads: 2
     mem_mb: 4096
@@ -57,6 +68,18 @@ resources:
     mem_mb: 512
     runtime_min: 15
   featurecounts:
+    threads: 2
+    mem_mb: 1024
+    runtime_min: 30
+  salmon:
+    threads: 2
+    mem_mb: 1024
+    runtime_min: 30
+  rsem_prepare_reference:
+    threads: 2
+    mem_mb: 1024
+    runtime_min: 30
+  rsem:
     threads: 2
     mem_mb: 1024
     runtime_min: 30

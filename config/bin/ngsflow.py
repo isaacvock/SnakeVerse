@@ -190,6 +190,41 @@ def required_sample_columns(assay: str) -> list[str]:
     return ["sample_id", "unit_id", "fastq_1"]
 
 
+def output_enabled(config: dict[str, Any], name: str) -> bool:
+    return bool((config.get("outputs") or {}).get(name, False))
+
+
+def featurecounts_enabled(config: dict[str, Any]) -> bool:
+    return any(
+        output_enabled(config, name)
+        for name in ("gene_counts", "exon_strict_counts", "full_gene_counts")
+    )
+
+
+def salmon_enabled(config: dict[str, Any]) -> bool:
+    return output_enabled(config, "salmon_gene_quant") or output_enabled(
+        config, "salmon_isoform_quant"
+    )
+
+
+def rsem_enabled(config: dict[str, Any]) -> bool:
+    return output_enabled(config, "rsem_gene_quant") or output_enabled(
+        config, "rsem_isoform_quant"
+    )
+
+
+def transcriptome_bam_needed(config: dict[str, Any]) -> bool:
+    return output_enabled(config, "transcriptome_bam") or salmon_enabled(config) or rsem_enabled(config)
+
+
+def trimming_tool(config: dict[str, Any]) -> str:
+    return str((config.get("trimming") or {}).get("tool") or "fastp")
+
+
+def row_is_paired(row: dict[str, str]) -> bool:
+    return bool(row.get("fastq_2")) or row.get("sra_layout") == "paired"
+
+
 def read_samples(sample_path: Path) -> tuple[list[str], list[dict[str, str]]]:
     with sample_path.open("r", encoding="utf-8", newline="") as handle:
         text = "".join(line for line in handle if not line.lstrip().startswith("#"))
@@ -355,8 +390,12 @@ def validation_messages(config: dict[str, Any]) -> tuple[list[str], list[str]]:
         errors.append("Samples file is missing columns: " + ", ".join(missing_columns))
     for row in rows:
         row.setdefault("fastq_2", "")
+        row.setdefault("sra_id", "")
+        row.setdefault("sra_layout", "")
         sample = row.get("sample_id", "<unknown>")
         for column in required:
+            if column == "fastq_1" and row.get("sra_id"):
+                continue
             if not row.get(column):
                 errors.append(f"Sample {sample} is missing {column}")
         if config.get("assay") == "rnaseq" and row.get("strandedness") not in {
@@ -367,12 +406,14 @@ def validation_messages(config: dict[str, Any]) -> tuple[list[str], list[str]]:
             errors.append(
                 f"Sample {sample} has invalid strandedness '{row.get('strandedness')}'"
             )
+        if row.get("sra_layout") and row.get("sra_layout") not in {"single", "paired"}:
+            errors.append(f"Sample {sample} has invalid sra_layout '{row.get('sra_layout')}'")
         for column in ("fastq_1", "fastq_2"):
             value = row.get(column)
             if value and not project_path(value, project_root).exists():
                 warnings.append(f"FASTQ path does not exist yet: {value}")
-    if config.get("assay") == "rnaseq" and (config.get("outputs") or {}).get("gene_counts", False):
-        layouts = {"paired" if row.get("fastq_2") else "single" for row in rows}
+    if config.get("assay") == "rnaseq" and featurecounts_enabled(config):
+        layouts = {"paired" if row_is_paired(row) else "single" for row in rows}
         if len(layouts) > 1:
             errors.append("featureCounts requires all samples in a run to share PE/SE layout")
         featurecounts_params = (
@@ -383,7 +424,7 @@ def validation_messages(config: dict[str, Any]) -> tuple[list[str], list[str]]:
     units_by_sample: dict[str, set[str]] = {}
     for row in rows:
         units_by_sample.setdefault(row.get("sample_id", "<unknown>"), set()).add(
-            "paired" if row.get("fastq_2") else "single"
+            "paired" if row_is_paired(row) else "single"
         )
     for sample, layouts in units_by_sample.items():
         if len(layouts) > 1:
@@ -392,11 +433,20 @@ def validation_messages(config: dict[str, Any]) -> tuple[list[str], list[str]]:
     aligner = (config.get("alignment") or {}).get("tool")
     required_tools = ["fastqc", "samtools", "multiqc"]
     if (config.get("steps") or {}).get("trimming", False):
-        required_tools.append("cutadapt")
+        active_trimmer = trimming_tool(config)
+        if active_trimmer not in {"cutadapt", "fastp"}:
+            errors.append(f"Unsupported trimming.tool: {active_trimmer}")
+        required_tools.append(active_trimmer)
+    if any(row.get("sra_id") and not row.get("fastq_1") for row in rows):
+        required_tools.append("sra_tools")
     if aligner:
         required_tools.append(aligner)
-    if config.get("assay") == "rnaseq":
+    if config.get("assay") == "rnaseq" and featurecounts_enabled(config):
         required_tools.append("featurecounts")
+    if config.get("assay") == "rnaseq" and salmon_enabled(config):
+        required_tools.append("salmon")
+    if config.get("assay") == "rnaseq" and rsem_enabled(config):
+        required_tools.append("rsem")
     if config.get("assay") == "atacseq":
         required_tools.extend(["bedtools", "macs3"])
     if (config.get("steps") or {}).get("coverage", False):
@@ -417,8 +467,13 @@ def validation_messages(config: dict[str, Any]) -> tuple[list[str], list[str]]:
         errors.append(f"Unsupported alignment.tool: {aligner}")
     elif not genome.get(index_keys[aligner]) and not genome.get("fasta"):
         errors.append(f"Genome profile must define genome.fasta when building a {aligner} index")
-    if config.get("assay") == "rnaseq" and not genome.get("gtf"):
-        errors.append("Genome profile must define genome.gtf for RNA-seq runs")
+    if config.get("assay") == "rnaseq" and featurecounts_enabled(config) and not genome.get("gtf"):
+        errors.append("Genome profile must define genome.gtf for RNA-seq featureCounts")
+    if config.get("assay") == "rnaseq" and (salmon_enabled(config) or rsem_enabled(config)):
+        if not genome.get("gtf"):
+            errors.append("Genome profile must define genome.gtf for Salmon/RSEM quantification")
+        if not genome.get("fasta"):
+            errors.append("Genome profile must define genome.fasta for Salmon/RSEM reference generation")
     if config.get("assay") == "atacseq":
         replicate_values = {row.get("replicate") for row in rows if row.get("replicate")}
         if len(replicate_values) < 2:
@@ -427,9 +482,9 @@ def validation_messages(config: dict[str, Any]) -> tuple[list[str], list[str]]:
             warnings.append("ATAC-seq blacklist filtering is recommended; genome.blacklist is blank")
         if config.get("outputs", {}).get("tss_enrichment", False) and not genome.get("tss_bed"):
             errors.append("outputs.tss_enrichment requires genome.tss_bed")
-    if config.get("outputs", {}).get("transcriptome_bam", False):
+    if transcriptome_bam_needed(config):
         if aligner != "star":
-            errors.append("outputs.transcriptome_bam requires alignment.tool: star")
+            errors.append("STAR transcriptome BAM outputs require alignment.tool: star")
         star_params = (config.get("tools", {}).get("star", {}).get("params", {}) or {})
         align_params = star_params.get("align", star_params)
         quant_mode = str(align_params.get("quantMode", ""))

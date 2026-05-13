@@ -65,6 +65,8 @@ def load_samples(
         ]
         for row in rows:
             row.setdefault("fastq_2", "")
+            row.setdefault("sra_id", "")
+            row.setdefault("sra_layout", "")
 
     seen_units: set[str] = set()
     for row in rows:
@@ -101,8 +103,17 @@ def sample_by_unit(samples: list[dict[str, str]], unit: str) -> dict[str, str]:
     raise KeyError(f"Unknown sample unit: {unit}")
 
 
+def has_sra_samples(samples: list[dict[str, str]]) -> bool:
+    return any(row.get("sra_id") and not row.get("fastq_1") for row in samples)
+
+
+def sra_fastq_path(row: dict[str, str], results_dir: str, read: str) -> str:
+    suffix = "R1" if read == "R1" else "R2"
+    return f"{results_dir}/fastq/sra/{unit_key(row)}_{suffix}.fastq.gz"
+
+
 def row_is_paired(row: dict[str, str]) -> bool:
-    return bool(row.get("fastq_2"))
+    return bool(row.get("fastq_2")) or row.get("sra_layout") == "paired"
 
 
 def unit_layout(samples: list[dict[str, str]], unit: str) -> str:
@@ -123,17 +134,39 @@ def run_layout(samples: list[dict[str, str]]) -> str:
     return layouts.pop()
 
 
-def fastq_for_read(samples: list[dict[str, str]], unit: str, read: str) -> str:
+def fastq_for_read(
+    samples: list[dict[str, str]], unit: str, read: str, results_dir: str | None = None
+) -> str:
     row = sample_by_unit(samples, unit)
     column = "fastq_1" if read == "R1" else "fastq_2"
     value = row.get(column, "")
+    if value:
+        return value
+    if row.get("sra_id"):
+        if read == "R2" and not row_is_paired(row):
+            raise ValueError(f"Sample unit {unit} is single-end and has no {column}")
+        if results_dir is None:
+            raise ValueError(
+                f"Sample unit {unit} uses sra_id and needs results_dir to resolve {column}"
+            )
+        return sra_fastq_path(row, results_dir, read)
     if not value:
         raise ValueError(f"Sample unit {unit} is missing {column}")
-    return value
 
 
-def optional_fastq_for_read(samples: list[dict[str, str]], unit: str, read: str) -> list[str]:
-    value = sample_by_unit(samples, unit).get("fastq_1" if read == "R1" else "fastq_2", "")
+def optional_fastq_for_read(
+    samples: list[dict[str, str]], unit: str, read: str, results_dir: str | None = None
+) -> list[str]:
+    row = sample_by_unit(samples, unit)
+    value = row.get("fastq_1" if read == "R1" else "fastq_2", "")
+    if value:
+        return [value]
+    if row.get("sra_id") and (read == "R1" or row_is_paired(row)):
+        if results_dir is None:
+            raise ValueError(
+                f"Sample unit {unit} uses sra_id and needs results_dir to resolve {read}"
+            )
+        return [sra_fastq_path(row, results_dir, read)]
     return [value] if value else []
 
 
@@ -141,9 +174,9 @@ def fastqc_targets(samples: list[dict[str, str]], results_dir: str) -> list[str]
     targets: list[str] = []
     for row in samples:
         unit = unit_key(row)
-        if row.get("fastq_1"):
+        if row.get("fastq_1") or row.get("sra_id"):
             targets.append(f"{results_dir}/qc/fastqc/{unit}.R1")
-        if row.get("fastq_2"):
+        if row_is_paired(row):
             targets.append(f"{results_dir}/qc/fastqc/{unit}.R2")
     return targets
 
@@ -153,7 +186,7 @@ def trimmed_fastq_targets(samples: list[dict[str, str]], results_dir: str) -> li
     for row in samples:
         unit = unit_key(row)
         targets.append(f"{results_dir}/fastq/trimmed/{unit}_R1.fastq.gz")
-        if row.get("fastq_2"):
+        if row_is_paired(row):
             targets.append(f"{results_dir}/fastq/trimmed/{unit}_R2.fastq.gz")
     return targets
 
@@ -225,7 +258,7 @@ def alignment_fastq_1(
     rows = units_by_sample(samples)[sample]
     if use_trimmed:
         return [f"{results_dir}/fastq/trimmed/{unit_key(row)}_R1.fastq.gz" for row in rows]
-    return [row["fastq_1"] for row in rows]
+    return [fastq_for_read(samples, unit_key(row), "R1", results_dir) for row in rows]
 
 
 def alignment_fastq_2(
@@ -236,9 +269,13 @@ def alignment_fastq_2(
         return [
             f"{results_dir}/fastq/trimmed/{unit_key(row)}_R2.fastq.gz"
             for row in rows
-            if row.get("fastq_2")
+            if row_is_paired(row)
         ]
-    return [row["fastq_2"] for row in rows if row.get("fastq_2")]
+    return [
+        fastq_for_read(samples, unit_key(row), "R2", results_dir)
+        for row in rows
+        if row_is_paired(row)
+    ]
 
 
 def sample_strandedness(samples: list[dict[str, str]], sample: str) -> str:

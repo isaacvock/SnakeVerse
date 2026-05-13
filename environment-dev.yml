@@ -22,12 +22,17 @@ dependencies:
   # Bioinformatics tools useful for local smoke tests.
   # The real workflow should still use per-rule conda envs.
   - fastqc
+  - fastp
   - cutadapt
+  - sra-tools
   - bowtie2
   - bwa-mem2
   - star
   - samtools
   - subread
+  - gffread
+  - salmon
+  - rsem
   - deeptools
   - bedtools
   - macs3

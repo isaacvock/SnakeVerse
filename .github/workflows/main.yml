@@ -27,7 +27,9 @@ jobs:
             snakemake
             pyyaml
             fastqc
+            fastp
             cutadapt
+            sra-tools
             bowtie2
             bwa-mem2
             star
@@ -35,6 +37,9 @@ jobs:
             bedtools
             macs3
             subread
+            gffread
+            salmon
+            rsem
             deeptools
             multiqc
           condarc: |
@@ -53,7 +58,8 @@ jobs:
             workflow/lib/refs.py \
             workflow/lib/samples.py \
             workflow/lib/tracks.py \
-            workflow/lib/validation.py
+            workflow/lib/validation.py \
+            workflow/scripts/gtf_to_gene_saf.py
 
       - name: Helper script checks
         run: |
@@ -101,6 +107,11 @@ jobs:
             --printshellcmds \
             --show-failed-logs \
             --latency-wait 30
+          test -s .test/results/rnaseq/counts/featurecounts/gene_counts.txt
+          test -s .test/results/rnaseq/counts/featurecounts/exon_strict_counts.txt
+          test -s .test/results/rnaseq/counts/featurecounts/full_gene_counts.txt
+          test -s .test/results/rnaseq/counts/salmon/WT_1/quant.sf
+          test -s .test/results/rnaseq/counts/salmon/WT_1/quant.genes.sf
 
       - name: Full ATAC-seq run
         run: |

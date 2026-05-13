@@ -14,8 +14,9 @@ K562 reads restricted to chr21.
 CI validates configs, lints the Snakefile, performs dry-runs, and executes:
 
 - a full single-end generic FASTQ-to-BAM run with Bowtie2 and generated indexes
-- a full paired-end RNA-seq run with STAR, generated indexes, transcriptome BAMs,
-  and featureCounts gene counts
+- a full paired-end RNA-seq run with fastp, STAR, generated indexes,
+  transcriptome BAMs, featureCounts standard/strict/full-gene counts, and Salmon
+  gene/isoform quantification
 - a BWA-MEM2 FASTQ-to-BAM dry-run to exercise the third aligner path
 - a full paired-end ATAC-seq run on the K562 ENCODE chr21 fixture with Bowtie2,
   duplicate marking, blacklist/TSS reference fields, MACS3 peaks, and ATAC QC

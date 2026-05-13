@@ -13,7 +13,9 @@ assays:
             - fastq_to_bam.yaml
           tools:
             - fastqc.yaml
+            - fastp.yaml
             - cutadapt.yaml
+            - sra_tools.yaml
             - bowtie2.yaml
             - bwa_mem2.yaml
             - star.yaml
@@ -37,12 +39,16 @@ assays:
             - rnaseq_star_featurecounts.yaml
           tools:
             - fastqc.yaml
+            - fastp.yaml
             - cutadapt.yaml
+            - sra_tools.yaml
             - bowtie2.yaml
             - bwa_mem2.yaml
             - star.yaml
             - samtools.yaml
             - featurecounts.yaml
+            - salmon.yaml
+            - rsem.yaml
             - deeptools.yaml
             - multiqc.yaml
           genomes:
@@ -62,7 +68,9 @@ assays:
             - atacseq_encode4.yaml
           tools:
             - fastqc.yaml
+            - fastp.yaml
             - cutadapt.yaml
+            - sra_tools.yaml
             - bowtie2.yaml
             - samtools.yaml
             - bedtools.yaml

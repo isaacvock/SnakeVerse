@@ -3,7 +3,7 @@ from refs import aligner_index_inputs, aligner_index_prefix
 from samples import star_reads_arg
 
 
-if output_enabled("transcriptome_bam"):
+if needs_transcriptome_bam():
     rule star_align:
         input:
             index=lambda wildcards: aligner_index_inputs(config, RESULTS_DIR, "star"),

@@ -1,0 +1,9 @@
+tool: salmon
+version: "1"
+
+params:
+  library_type: A
+  seq_bias: false
+  gc_bias: false
+
+extra: ""

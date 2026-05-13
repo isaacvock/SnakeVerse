@@ -1,5 +1,5 @@
-sample_id	unit_id	fastq_1	fastq_2	condition	replicate
-atac_rep1	L001	fastq/atac_rep1_R1.fastq.gz	fastq/atac_rep1_R2.fastq.gz	treated	1
-atac_rep2	L001	fastq/atac_rep2_R1.fastq.gz	fastq/atac_rep2_R2.fastq.gz	treated	2
+sample_id	unit_id	fastq_1	fastq_2	condition	replicate	sra_id	sra_layout
+atac_rep1	L001	fastq/atac_rep1_R1.fastq.gz	fastq/atac_rep1_R2.fastq.gz	treated	1		
+atac_rep2	L001	fastq/atac_rep2_R1.fastq.gz	fastq/atac_rep2_R2.fastq.gz	treated	2		
 # For single-end data, leave fastq_2 blank.
-
+# To download from SRA, set sra_id and leave fastq_1/fastq_2 blank. Use sra_layout=paired for paired-end SRA runs.

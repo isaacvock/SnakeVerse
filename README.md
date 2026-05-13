@@ -82,15 +82,20 @@ The workflow itself uses per-rule conda environment YAMLs in `workflow/envs/`.
 The current basic workflows support:
 
 - paired-end and single-end FASTQ inputs
-- optional cutadapt trimming
+- optional fastp trimming by default, with cutadapt still selectable
+- optional SRA Toolkit FASTQ download from `sra_id` sample-sheet values
 - FastQC and MultiQC
 - alignment with Bowtie2, STAR, or BWA-MEM2
 - automatic Bowtie2, STAR, or BWA-MEM2 index creation when the selected index
   path is left blank
 - BAM sorting, indexing, filtering, and samtools QC
 - optional deepTools BigWig generation
-- RNA-seq gene counts with featureCounts
+- RNA-seq gene counts with featureCounts, including optional strict exon and
+  full gene-body counting modes
 - optional STAR transcriptome-aligned BAMs
+- optional Salmon or RSEM gene/isoform quantification from STAR transcriptome
+  BAMs, with transcript FASTA/RSEM references generated from the genome FASTA
+  and GTF
 - ATAC-seq duplicate marking, mitochondrial/blacklist filtering, MACS3
   narrowPeak calls, FRiP, library complexity, fragment length summaries, and an
   optional simple TSS enrichment proxy
@@ -134,12 +139,15 @@ python config/bin/ngsflow.py init-run \
 The RNA-seq preset currently includes:
 
 - FastQC
-- optional cutadapt trimming
+- optional fastp trimming by default, or cutadapt when `trimming.tool` is set
+  to `cutadapt`
 - STAR alignment
 - samtools BAM filtering and indexing
 - samtools BAM QC
 - featureCounts gene-level counts
+- optional featureCounts strict exon and full gene-body counts
 - optional STAR transcriptome-aligned BAMs
+- optional Salmon or RSEM gene/isoform quantification from BAM input
 - optional deepTools BigWig generation
 - MultiQC
 
@@ -151,6 +159,18 @@ scaffolding. featureCounts strandedness is controlled in the editable
 For single-end data, leave the `fastq_2` value blank in the sample sheet. For
 RNA-seq gene counting, all samples in one run should share the same paired-end or
 single-end layout because featureCounts is executed once across the run.
+
+Sample sheets may include `sra_id` and `sra_layout`. When `sra_id` is set and
+FASTQ paths are blank, SnakeVerse downloads FASTQs with SRA Toolkit; set
+`sra_layout: paired` for paired-end SRA accessions.
+
+RNA-seq output switches live in the run config. `gene_counts` is the standard
+featureCounts exon count matrix. `exon_strict_counts` adds `--nonOverlap 0`,
+and the STAR profile uses `alignEndsType: EndToEnd` by default so soft-clipped
+bases do not make otherwise exonic alignments fail that strict overlap test.
+`full_gene_counts` counts reads against generated gene-span SAF annotations.
+`salmon_gene_quant`, `salmon_isoform_quant`, `rsem_gene_quant`, and
+`rsem_isoform_quant` enable transcriptome-BAM quantification.
 
 ## Initialize an ATAC-seq Run
 
@@ -285,8 +305,8 @@ extra: ""
 The workflow renders these structured settings into command-line arguments.
 Boolean values become flags when true and are omitted when false. Strings and
 numbers become flag values. Tool-specific renderers handle common differences
-for Bowtie2, STAR, samtools, featureCounts, deepTools, cutadapt, FastQC, MACS3,
-and MultiQC.
+for Bowtie2, STAR, samtools, featureCounts, Salmon, RSEM, deepTools, fastp,
+cutadapt, FastQC, MACS3, and MultiQC.
 
 `extra` is appended verbatim to the relevant tool command. Use it for flags that
 are too new, too specialized, or too awkward to model structurally yet.
@@ -301,8 +321,9 @@ alignment:
 Valid values are `bowtie2`, `star`, and `bwa_mem2`. Keep the matching tool
 profile in `config/profiles/tools/`.
 
-For STAR transcriptome-aligned BAMs, set `outputs.transcriptome_bam: true` and
-make sure the STAR align parameters include `TranscriptomeSAM`:
+For STAR transcriptome-aligned BAMs, set `outputs.transcriptome_bam: true`.
+Salmon and RSEM quantification outputs also request this BAM internally. In both
+cases, make sure the STAR align parameters include `TranscriptomeSAM`:
 
 ```yaml
 params:
@@ -334,7 +355,6 @@ This is first-round infrastructure, not a biologically exhaustive pipeline.
 - RNA-seq differential expression is not implemented.
 - ATAC-seq replicated IDR, pseudoreplicate peak selection, and exact ENCODE
   TSS enrichment scoring are not implemented yet.
-- Salmon quantification is not implemented yet.
 - Reference FASTA/GTF acquisition is not implemented.
 - STAR output handling assumes sorted genome BAM output from the provided STAR profile.
 - Validation is intentionally useful but not comprehensive.

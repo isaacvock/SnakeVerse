@@ -1,0 +1,9 @@
+# Editable SRA Toolkit profile.
+tool: sra_tools
+version: "3"
+
+params: {}
+
+# Appended verbatim to the fasterq-dump command.
+extra: ""
+

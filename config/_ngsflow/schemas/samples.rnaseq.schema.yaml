@@ -13,7 +13,7 @@ columns:
   unit_id:
     description: "Sequencing unit or lane identifier."
   fastq_1:
-    description: "Path to R1 FASTQ, relative to the project root or absolute."
+    description: "Path to R1 FASTQ, relative to the project root or absolute. May be blank when sra_id is provided."
   fastq_2:
     description: "Optional path to R2 FASTQ. Leave blank or omit for single-end data."
   condition:
@@ -22,3 +22,7 @@ columns:
     description: "Replicate number or replicate label."
   strandedness:
     description: "One of unstranded, forward, or reverse."
+  sra_id:
+    description: "Optional SRA run accession to download when local FASTQ paths are blank."
+  sra_layout:
+    description: "Optional SRA layout hint, single or paired. Use paired when downloading paired-end SRA runs."

@@ -1,0 +1,12 @@
+# Editable Salmon profile.
+tool: salmon
+version: "1"
+
+params:
+  library_type: A
+  seq_bias: true
+  gc_bias: true
+
+# Appended verbatim to the salmon quant command.
+extra: ""
+

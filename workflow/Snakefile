@@ -18,6 +18,7 @@ from samples import (
     bigwig_targets,
     filtered_bam_targets,
     fastqc_targets,
+    has_sra_samples,
     load_samples,
     raw_bam_targets,
     sample_ids,
@@ -50,6 +51,10 @@ for warning in VALIDATION_WARNINGS:
 output_enabled = lambda name: bool(config.get("outputs", {}).get(name, False))
 step_enabled = lambda name, default=True: bool(config.get("steps", {}).get(name, default))
 trimming_for_alignment = lambda: step_enabled("trimming", False)
+TRIMMING_TOOL = config.get("trimming", {}).get("tool") or "fastp"
+salmon_quant_enabled = lambda: output_enabled("salmon_gene_quant") or output_enabled("salmon_isoform_quant")
+rsem_quant_enabled = lambda: output_enabled("rsem_gene_quant") or output_enabled("rsem_isoform_quant")
+needs_transcriptome_bam = lambda: output_enabled("transcriptome_bam") or salmon_quant_enabled() or rsem_quant_enabled()
 
 raw_bam_path = lambda sample: f"{RESULTS_DIR}/bam/raw/{sample}.bam"
 raw_bai_path = lambda sample: f"{RESULTS_DIR}/bam/raw/{sample}.bam.bai"
@@ -86,6 +91,9 @@ rule all:
     input:
         lambda wildcards: ASSAY_TARGETS
 
+
+if has_sra_samples(SAMPLES):
+    include: str(WORKFLOW_DIR / "rules" / "common" / "sra_download.smk")
 
 include: str(WORKFLOW_DIR / "rules" / "common" / "fastq_qc.smk")
 
