@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from refs import INDEX_KEYS, configured_index, genome_fasta, path_exists
+from refs import INDEX_KEYS, genome_fasta, index_requires_build, path_exists
 from samples import (
     featurecounts_paired_end,
     has_sra_samples,
@@ -99,7 +99,7 @@ def validate_resolved_config(config: dict[str, Any], samples: list[dict[str, str
     genome = config.get("genome", {}) or {}
     if aligner not in {"bowtie2", "star", "bwa_mem2"}:
         errors.append(f"Unsupported alignment.tool: {aligner}")
-    if aligner in INDEX_KEYS and not configured_index(config, aligner) and not genome_fasta(config):
+    if aligner in INDEX_KEYS and index_requires_build(config, aligner) and not genome_fasta(config):
         errors.append(f"Genome profile must define genome.fasta when building a {aligner} index")
     if assay == "rnaseq" and _featurecounts_enabled(config) and not genome.get("gtf"):
         errors.append("Genome profile must define genome.gtf for RNA-seq featureCounts")
@@ -133,6 +133,8 @@ def validate_resolved_config(config: dict[str, Any], samples: list[dict[str, str
     for ref_key in ("fasta", "gtf", "chrom_sizes", "blacklist", "tss_bed", "bowtie2_index", "star_index", "bwa_mem2_index"):
         value = genome.get(ref_key)
         if value:
+            if ref_key == INDEX_KEYS.get(aligner) and index_requires_build(config, str(aligner)):
+                continue
             if not path_exists(config.get("_ngsflow", {}).get("project_root", "."), str(value)):
                 warnings.append(f"Reference path for genome.{ref_key} does not exist yet: {value}")
 

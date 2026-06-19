@@ -1,12 +1,12 @@
 from params import render_tool_params, resource_value, tool_extra
-from refs import generated_index_dir, genome_fasta, star_gtf_arg
+from refs import aligner_index_marker, aligner_index_prefix, genome_fasta, star_gtf_arg
 
 
 rule star_index:
     input:
         fasta=lambda wildcards: genome_fasta(config)
     output:
-        touch(f"{RESULTS_DIR}/reference/star/{GENOME_SLUG}/.snakeverse_star_index.done")
+        touch(aligner_index_marker(config, RESULTS_DIR, "star"))
     log:
         f"{RESULTS_DIR}/logs/star/build_index.log"
     threads:
@@ -17,7 +17,7 @@ rule star_index:
     conda:
         workflow_file("envs/star.yaml")
     params:
-        genome_dir=lambda wildcards: generated_index_dir(config, RESULTS_DIR, "star"),
+        genome_dir=lambda wildcards: aligner_index_prefix(config, RESULTS_DIR, "star"),
         gtf_arg=lambda wildcards: star_gtf_arg(config),
         rendered=lambda wildcards: render_tool_params(config, "star", section="index"),
         extra=lambda wildcards: tool_extra(config, "star")

@@ -112,6 +112,8 @@ jobs:
           test -s .test/results/rnaseq/counts/featurecounts/full_gene_counts.txt
           test -s .test/results/rnaseq/counts/salmon/WT_1/quant.sf
           test -s .test/results/rnaseq/counts/salmon/WT_1/quant.genes.sf
+          test -s .test/results/rnaseq/reference/star/configured_index/Genome
+          test -e .test/results/rnaseq/reference/star/configured_index/.snakeverse_star_index.done
 
       - name: Full ATAC-seq run
         run: |

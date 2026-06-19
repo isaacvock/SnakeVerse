@@ -240,9 +240,9 @@ Snakemake may report missing input files. Update `config/samples/<run>.tsv` and
 
 ## Reference Indexes
 
-Genome profiles can either point to existing indexes or ask SnakeVerse to build
-them. Leave the selected aligner's index path blank to build under the active
-results directory:
+Genome profiles can point to an existing index or choose where SnakeVerse should
+build one. Leave the selected aligner's index path blank to build under the
+active results directory:
 
 ```yaml
 genome:
@@ -261,6 +261,17 @@ genome:
   bowtie2_index: resources/genomes/hg38/bowtie2/hg38
   star_index: resources/genomes/hg38/star
   bwa_mem2_index: resources/genomes/hg38/bwa_mem2/hg38
+```
+
+You can also set a path that does not exist yet. SnakeVerse checks for the
+aligner's expected index files and, when they are missing, builds the index at
+the configured path. For STAR, the configured value is the index directory:
+
+```yaml
+genome:
+  fasta: resources/genomes/hg38/hg38.fa
+  gtf: resources/genomes/hg38/gencode.annotation.gtf
+  star_index: resources/genomes/hg38/star
 ```
 
 STAR index-building uses `genome.fasta` and, when present, `genome.gtf`.

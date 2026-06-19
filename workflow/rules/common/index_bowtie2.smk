@@ -1,12 +1,12 @@
 from params import render_tool_params, resource_value, tool_extra
-from refs import generated_index_prefix, genome_fasta
+from refs import aligner_index_marker, aligner_index_prefix, genome_fasta
 
 
 rule bowtie2_index:
     input:
         fasta=lambda wildcards: genome_fasta(config)
     output:
-        touch(f"{RESULTS_DIR}/reference/bowtie2/{GENOME_SLUG}/.snakeverse_bowtie2_index.done")
+        touch(aligner_index_marker(config, RESULTS_DIR, "bowtie2"))
     log:
         f"{RESULTS_DIR}/logs/bowtie2/build_index.log"
     threads:
@@ -17,7 +17,7 @@ rule bowtie2_index:
     conda:
         workflow_file("envs/bowtie2.yaml")
     params:
-        prefix=lambda wildcards: generated_index_prefix(config, RESULTS_DIR, "bowtie2"),
+        prefix=lambda wildcards: aligner_index_prefix(config, RESULTS_DIR, "bowtie2"),
         rendered=lambda wildcards: render_tool_params(config, "bowtie2", section="index"),
         extra=lambda wildcards: tool_extra(config, "bowtie2")
     shell:

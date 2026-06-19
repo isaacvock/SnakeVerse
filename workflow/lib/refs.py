@@ -10,6 +10,17 @@ INDEX_KEYS = {
     "bwa_mem2": "bwa_mem2_index",
 }
 
+STAR_INDEX_FILES = (
+    "Genome",
+    "SA",
+    "SAindex",
+    "chrLength.txt",
+    "chrName.txt",
+    "chrNameLength.txt",
+    "chrStart.txt",
+    "genomeParameters.txt",
+)
+
 
 def genome_name(config: dict[str, Any]) -> str:
     return str(config.get("genome", {}).get("name") or "genome")
@@ -28,6 +39,39 @@ def configured_index(config: dict[str, Any], aligner: str) -> str:
 
 def index_is_configured(config: dict[str, Any], aligner: str) -> bool:
     return bool(configured_index(config, aligner))
+
+
+def _project_path(config: dict[str, Any], value: str) -> Path:
+    path = Path(value)
+    if path.is_absolute():
+        return path
+    project_root = Path(config.get("_ngsflow", {}).get("project_root", "."))
+    return project_root / path
+
+
+def configured_index_is_ready(config: dict[str, Any], aligner: str) -> bool:
+    """Return true when a configured index contains the expected files."""
+    configured = configured_index(config, aligner)
+    if not configured:
+        return False
+
+    index_path = _project_path(config, configured)
+    if aligner == "star":
+        return all((index_path / name).exists() for name in STAR_INDEX_FILES)
+    if aligner == "bowtie2":
+        small_index = (".1.bt2", ".2.bt2", ".3.bt2", ".4.bt2", ".rev.1.bt2", ".rev.2.bt2")
+        large_index = tuple(suffix + "l" for suffix in small_index)
+        return all(Path(str(index_path) + suffix).exists() for suffix in small_index) or all(
+            Path(str(index_path) + suffix).exists() for suffix in large_index
+        )
+    if aligner == "bwa_mem2":
+        suffixes = (".0123", ".amb", ".ann", ".bwt.2bit.64", ".pac")
+        return all(Path(str(index_path) + suffix).exists() for suffix in suffixes)
+    return index_path.exists()
+
+
+def index_requires_build(config: dict[str, Any], aligner: str) -> bool:
+    return not configured_index_is_ready(config, aligner)
 
 
 def generated_index_dir(config: dict[str, Any], results_dir: str, aligner: str) -> str:
@@ -49,10 +93,19 @@ def generated_index_marker(config: dict[str, Any], results_dir: str, aligner: st
     return f"{generated_index_dir(config, results_dir, aligner)}/.snakeverse_{aligner}_index.done"
 
 
+def aligner_index_marker(config: dict[str, Any], results_dir: str, aligner: str) -> str:
+    configured = configured_index(config, aligner)
+    if not configured:
+        return generated_index_marker(config, results_dir, aligner)
+    if aligner == "star":
+        return f"{configured}/.snakeverse_star_index.done"
+    return f"{configured}.snakeverse_{aligner}_index.done"
+
+
 def aligner_index_inputs(config: dict[str, Any], results_dir: str, aligner: str) -> list[str]:
-    if index_is_configured(config, aligner):
+    if configured_index_is_ready(config, aligner):
         return []
-    return [generated_index_marker(config, results_dir, aligner)]
+    return [aligner_index_marker(config, results_dir, aligner)]
 
 
 def genome_fasta(config: dict[str, Any]) -> str:

@@ -63,6 +63,46 @@ def project_path(value: str | Path, project_root: Path) -> Path:
     return (project_root / path).resolve()
 
 
+INDEX_KEYS = {
+    "bowtie2": "bowtie2_index",
+    "star": "star_index",
+    "bwa_mem2": "bwa_mem2_index",
+}
+
+STAR_INDEX_FILES = (
+    "Genome",
+    "SA",
+    "SAindex",
+    "chrLength.txt",
+    "chrName.txt",
+    "chrNameLength.txt",
+    "chrStart.txt",
+    "genomeParameters.txt",
+)
+
+
+def configured_index_is_ready(
+    genome: dict[str, Any], aligner: str, project_root: Path
+) -> bool:
+    configured = str(genome.get(INDEX_KEYS.get(aligner, "")) or "").rstrip("/")
+    if not configured:
+        return False
+
+    index_path = project_path(configured, project_root)
+    if aligner == "star":
+        return all((index_path / name).exists() for name in STAR_INDEX_FILES)
+    if aligner == "bowtie2":
+        small_index = (".1.bt2", ".2.bt2", ".3.bt2", ".4.bt2", ".rev.1.bt2", ".rev.2.bt2")
+        large_index = tuple(suffix + "l" for suffix in small_index)
+        return all(Path(str(index_path) + suffix).exists() for suffix in small_index) or all(
+            Path(str(index_path) + suffix).exists() for suffix in large_index
+        )
+    if aligner == "bwa_mem2":
+        suffixes = (".0123", ".amb", ".ann", ".bwt.2bit.64", ".pac")
+        return all(Path(str(index_path) + suffix).exists() for suffix in suffixes)
+    return index_path.exists()
+
+
 def display_path(path: Path, project_root: Path) -> str:
     try:
         return path.relative_to(project_root).as_posix()
@@ -458,14 +498,9 @@ def validation_messages(config: dict[str, Any]) -> tuple[list[str], list[str]]:
         errors.append("Missing active tool profiles: " + ", ".join(missing_tools))
 
     genome = config.get("genome") or {}
-    index_keys = {
-        "bowtie2": "bowtie2_index",
-        "star": "star_index",
-        "bwa_mem2": "bwa_mem2_index",
-    }
-    if aligner not in index_keys:
+    if aligner not in INDEX_KEYS:
         errors.append(f"Unsupported alignment.tool: {aligner}")
-    elif not genome.get(index_keys[aligner]) and not genome.get("fasta"):
+    elif not configured_index_is_ready(genome, aligner, project_root) and not genome.get("fasta"):
         errors.append(f"Genome profile must define genome.fasta when building a {aligner} index")
     if config.get("assay") == "rnaseq" and featurecounts_enabled(config) and not genome.get("gtf"):
         errors.append("Genome profile must define genome.gtf for RNA-seq featureCounts")
@@ -493,6 +528,8 @@ def validation_messages(config: dict[str, Any]) -> tuple[list[str], list[str]]:
 
     for key in ("fasta", "gtf", "chrom_sizes", "blacklist", "tss_bed", "bowtie2_index", "star_index", "bwa_mem2_index"):
         value = genome.get(key)
+        if value and key == INDEX_KEYS.get(aligner) and not configured_index_is_ready(genome, aligner, project_root):
+            continue
         if value and not project_path(str(value), project_root).exists():
             warnings.append(f"Reference path for genome.{key} does not exist yet: {value}")
 
