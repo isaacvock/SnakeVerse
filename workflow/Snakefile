@@ -29,9 +29,9 @@ for module_name, module_path in WORKFLOW_LIB_MODULES:
     spec = importlib.util.spec_from_file_location(module_name, source_path)
     if spec is None or spec.loader is None:
         raise ImportError(f"Could not import workflow module {module_name} from {source_path}")
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[module_name] = module
-    spec.loader.exec_module(module)
+    loaded_workflow_module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = loaded_workflow_module
+    spec.loader.exec_module(loaded_workflow_module)
 
 snakeverse_config = sys.modules["snakeverse_config"]
 get_results_dir = snakeverse_config.get_results_dir
