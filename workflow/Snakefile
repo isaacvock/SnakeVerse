@@ -4,6 +4,14 @@ import sys
 
 configfile: "config/config.yaml"
 
+container: "docker://docker.io/isaacvock/snakeverse-base:0.1.0"
+
+###############################################################################################################
+# STEP 1: WORK REALLY HARD TO BE ABLE TO LOAD THE FUNCTIONS IN `workflow/lib` no matter how the pipeline is run
+###############################################################################################################
+
+# Gotta figure out where the workflow is, or where it's cached version is
+# if we are working with a remote deployment.
 if hasattr(workflow, "source_path"):
     WORKFLOW_DIR = Path(workflow.source_path("Snakefile")).resolve().parent
     workflow_file = lambda path: str(Path(workflow.source_path(path)).resolve())
@@ -12,9 +20,17 @@ else:
     workflow_file = lambda path: str((WORKFLOW_DIR / path).resolve())
 
 
+# Figure out where are the scripts are that provide functions used
+# by this workflow
 WORKFLOW_LIB_DIR = Path(workflow_file("lib/config.py")).parent
+
+# Can't totally remember why I had to do this, but
+# idea is that by moving this path to the top of the searched
+# paths, you can oft avoid importing the incorrect module
+# from a similarly named script/path
 sys.path.insert(0, str(WORKFLOW_LIB_DIR))
 
+# Everything that can be loaded as a module
 WORKFLOW_LIB_MODULES = [
     ("snakeverse_config", "lib/config.py"),
     ("samples", "lib/samples.py"),
@@ -24,6 +40,7 @@ WORKFLOW_LIB_MODULES = [
     ("validation", "lib/validation.py"),
 ]
 
+# Never had to work so hard to just load a module, but here we are
 for module_name, module_path in WORKFLOW_LIB_MODULES:
     source_path = workflow_file(module_path)
     spec = importlib.util.spec_from_file_location(module_name, source_path)

@@ -12,6 +12,227 @@ The repository is intentionally Snakemake-native. SnakeVerse provides workflow
 rules, config templates, and a small local config helper, but Snakemake remains
 the runner.
 
+## Quickstart
+
+This example deploys SnakeVerse and initializes a bulk RNA-seq run. The generic
+FASTQ-to-BAM and ATAC-seq initialization commands are documented below.
+
+### 1. Install the deployment tools
+
+Install [Miniforge](https://github.com/conda-forge/miniforge) and
+[Git](https://git-scm.com/install/) if they are not already available, then
+create a small environment containing Snakemake and Snakedeploy:
+
+```bash
+mamba create \
+  --name deploy_snakemake \
+  --channel conda-forge \
+  --channel bioconda \
+  snakemake snakedeploy
+
+conda activate deploy_snakemake
+```
+
+SnakeVerse runs its tools in rule-specific Conda environments. To keep those
+environments in one reusable location, rather than separately under every
+project, optionally set `SNAKEMAKE_CONDA_PREFIX`:
+
+```bash
+export SNAKEMAKE_CONDA_PREFIX="/path/to/snakemake-conda-envs"
+mkdir -p "$SNAKEMAKE_CONDA_PREFIX"
+```
+
+Add the `export` command to your shell startup file if it should apply to future
+sessions. Otherwise, it applies only to the current terminal.
+
+### 2. Deploy SnakeVerse
+
+Create one working directory for this project or dataset, enter it, and deploy
+the workflow:
+
+```bash
+mkdir -p my-rnaseq-project
+cd my-rnaseq-project
+
+conda activate deploy_snakemake
+snakedeploy deploy-workflow \
+  https://github.com/isaacvock/SnakeVerse.git \
+  . \
+  --branch main
+```
+
+The deployment contains a local `config/` directory for editable project files
+and a `workflow/` entry point that references the remote SnakeVerse workflow.
+
+### 3. Initialize a run
+
+Use the local helper to materialize an RNA-seq configuration:
+
+```bash
+python config/bin/ngsflow.py init-run \
+  --assay rnaseq \
+  --preset star_featurecounts \
+  --genome hg38 \
+  --run-name rnaseq
+```
+
+For this example, `ngsflow.py` creates or activates the following files. Edit
+them in this priority order:
+
+1. **`config/samples/rnaseq.tsv`**: Replace the example rows with the sample and
+   sequencing-unit identifiers, FASTQ paths, condition, replicate, and
+   strandedness for the run. For SRA input, provide `sra_id` and `sra_layout`
+   and leave the FASTQ columns blank.
+2. **`config/profiles/genomes/hg38.yaml`**: Set paths to the reference FASTA,
+   GTF, chromosome sizes, and any assay-specific resources. If the selected
+   aligner's configured index files do not exist, SnakeVerse builds them at that
+   path; a blank index path builds them under the run's results directory.
+   RNA-seq does not require the blacklist or TSS BED fields.
+3. **`config/runs/rnaseq.yaml`**: Set the project name, results directory, and
+   desired outputs. This file also records the assay, preset, sample sheet, and
+   ordered profile stack for this run.
+4. **`config/profiles/protocols/rnaseq_star_featurecounts.yaml`**: Review enabled
+   steps, trimming and alignment tools, strand-aware coverage behavior, and
+   per-rule thread, memory, and runtime requests.
+5. **`config/profiles/tools/*.yaml`**: Review tool-specific command-line
+   behavior. The RNA-seq preset materializes editable profiles for FastQC,
+   fastp, cutadapt, SRA Tools, Bowtie2, BWA-MEM2, STAR, samtools,
+   featureCounts, Salmon, RSEM, deepTools, and MultiQC. Each tool profile has an
+   `extra` field for flags not represented by structured parameters.
+6. **`config/profiles/assays/rnaseq.yaml`**: This contains stable assay-level
+   defaults and the sample schema. Most runs can leave it unchanged.
+7. **`config/config.yaml`**: The helper updates this pointer to
+   `config/runs/rnaseq.yaml`. Normally, verify it rather than editing it by
+   hand; `activate-run` can switch the pointer later.
+
+The copies under `config/_ngsflow/` are shipped templates. Edit the active files
+listed above, not the templates, unless you are developing SnakeVerse itself.
+
+### 4. Validate and run
+
+Inspect the resolved stack, validate obvious path and sample-sheet problems,
+then perform a dry-run:
+
+```bash
+python config/bin/ngsflow.py explain --configfile config/config.yaml
+python config/bin/ngsflow.py validate --configfile config/config.yaml
+
+snakemake \
+  --configfile config/config.yaml \
+  --use-conda \
+  --cores 16 \
+  --dry-run
+```
+
+Remove `--dry-run` to execute the pipeline:
+
+```bash
+snakemake \
+  --configfile config/config.yaml \
+  --use-conda \
+  --cores 16
+```
+
+## Quickstart: Sherlock and Slurm HPC
+
+The configuration and initialization steps are the same on Stanford Sherlock.
+The differences are where reusable environments are stored, activating the
+SnakeVerse base container, and using an external Slurm profile for scalable job
+submission.
+
+### 1. Configure persistent environment storage
+
+Your Bash startup file is `$HOME/.bashrc`. Add a shared Conda-environment
+location so every compute node can access the same rule environments:
+
+```bash
+export SNAKEMAKE_CONDA_PREFIX="$OAK/$USER/snakeverse/conda"
+```
+
+Then load the setting and create the directory:
+
+```bash
+source "$HOME/.bashrc"
+mkdir -p "$SNAKEMAKE_CONDA_PREFIX"
+```
+
+You can place the export directly in a Slurm launch script instead if you do
+not want it applied to every shell session.
+
+### 2. Deploy and initialize
+
+From a suitable project or group filesystem, repeat the normal deployment and
+initialization steps:
+
+```bash
+conda activate deploy_snakemake
+mkdir -p my-rnaseq-project
+cd my-rnaseq-project
+
+snakedeploy deploy-workflow \
+  https://github.com/isaacvock/SnakeVerse.git \
+  . \
+  --branch main
+
+python config/bin/ngsflow.py init-run \
+  --assay rnaseq \
+  --preset star_featurecounts \
+  --genome hg38 \
+  --run-name rnaseq
+```
+
+Edit the generated samples, genome, run, protocol, and tool profiles in the
+same priority order described in the standard quickstart.
+
+### 3. Validate the containerized run
+
+SnakeVerse declares a fixed public base container containing a compatible Linux
+user space and Miniforge. Sherlock users should enable both deployment methods:
+
+```bash
+snakemake \
+  --configfile config/config.yaml \
+  --use-apptainer \
+  --use-conda \
+  --cores 1 \
+  --dry-run
+```
+
+`--use-apptainer` runs rule jobs in the SnakeVerse base container, while
+`--use-conda` creates and activates each rule's tool environment inside that
+container. The container image is fixed by the workflow and does not need to be
+specified in project configuration.
+
+### 4. Scale out with a Slurm profile
+
+Do not run a full production workflow on a Sherlock login node. Use an external
+Snakemake profile and preferably submit the controlling Snakemake process as a
+small Slurm job. A profile translates SnakeVerse `threads` and `resources`
+values into per-rule `sbatch` submissions.
+
+[`yale_profile`](https://github.com/isaacvock/yale_profile) provides a concrete
+collection of Snakemake profile, launch-script, and job-status files for a
+Slurm HPC system. Its partition names, modules, email settings, and paths are
+Yale-specific, and its resource names must be mapped to SnakeVerse resources
+when adapting it for Sherlock. Its current profile also targets Snakemake
+versions earlier than 8, so use a compatible Snakemake version or port the same
+pattern to a current executor profile. For a maintained alternative, see
+[`smk-simple-slurm`](https://github.com/jdblischak/smk-simple-slurm).
+
+With a Sherlock-compatible profile, the launch command has this general form:
+
+```bash
+snakemake \
+  --configfile config/config.yaml \
+  --use-apptainer \
+  --use-conda \
+  --profile /path/to/sherlock-profile
+```
+
+The Slurm profile remains external to SnakeVerse: it controls submission and
+cluster policy, while the workflow continues to control biological processing,
+software environments, and rule resources.
+
 ## Design Model
 
 One Snakemake run processes one assay/profile stack. Multi-assay projects should
@@ -280,18 +501,23 @@ Bowtie2 and BWA-MEM2 index-building use `genome.fasta`.
 ## Cluster and Slurm Execution
 
 SnakeVerse does not implement Slurm or cluster submission logic. Use an external
-Snakemake workflow profile, such as `smk-simple-slurm`, when you want cluster
-execution:
+Snakemake profile, such as
+[`smk-simple-slurm`](https://github.com/jdblischak/smk-simple-slurm), when you
+want cluster execution:
 
 ```bash
 snakemake \
   --configfile config/config.yaml \
   --use-conda \
-  --workflow-profile path/to/smk-simple-slurm
+  --profile path/to/slurm-profile
 ```
 
-Keeping execution profiles external avoids coupling biological workflow logic to
-a particular cluster.
+On Sherlock, also pass `--use-apptainer`. The
+[`yale_profile`](https://github.com/isaacvock/yale_profile) repository is a
+useful example of the profile, controller-job, and status-checking files used to
+scale Snakemake across a Slurm cluster; adapt its site-specific settings and
+check its stated Snakemake-version compatibility. Keeping execution profiles
+external avoids coupling biological workflow logic to a particular cluster.
 
 ## Editing Tool Profiles
 
