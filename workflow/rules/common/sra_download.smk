@@ -21,23 +21,33 @@ rule sra_fastq:
     shell:
         """
         set -euo pipefail
-        mkdir -p $(dirname {output.r1}) $(dirname {log})
+        mkdir -p "$(dirname {output.r1:q})" "$(dirname {log:q})"
+        exec > {log:q} 2>&1
+
         tmpdir=$(mktemp -d)
-        fasterq-dump {params.accession} --split-files --threads {threads} \
-            --outdir "$tmpdir" {params.extra} > {log} 2>&1
-        if [ -s "$tmpdir/{params.accession}_1.fastq" ]; then
-            gzip -c "$tmpdir/{params.accession}_1.fastq" > {output.r1}
-        elif [ -s "$tmpdir/{params.accession}.fastq" ]; then
-            gzip -c "$tmpdir/{params.accession}.fastq" > {output.r1}
+        trap 'rm -rf "$tmpdir"' EXIT
+
+        accession={params.accession:q}
+        paired_r1="$tmpdir/$accession"_1.fastq
+        paired_r2="$tmpdir/$accession"_2.fastq
+        single_r1="$tmpdir/$accession".fastq
+
+        fasterq-dump "$accession" --split-files --threads {threads} \
+            --mem {resources.mem_mb}M --temp "$tmpdir" --outdir "$tmpdir" \
+            {params.extra}
+
+        if [ -s "$paired_r1" ]; then
+            pigz -p {threads} -c "$paired_r1" > {output.r1:q}
+        elif [ -s "$single_r1" ]; then
+            pigz -p {threads} -c "$single_r1" > {output.r1:q}
         else
-            echo "No R1 FASTQ produced for {params.accession}" >> {log}
-            rm -rf "$tmpdir"
+            echo "No R1 FASTQ produced for $accession"
             exit 1
         fi
-        if [ -s "$tmpdir/{params.accession}_2.fastq" ]; then
-            gzip -c "$tmpdir/{params.accession}_2.fastq" > {output.r2}
+
+        if [ -s "$paired_r2" ]; then
+            pigz -p {threads} -c "$paired_r2" > {output.r2:q}
         else
-            : > {output.r2}
+            pigz -p {threads} -c /dev/null > {output.r2:q}
         fi
-        rm -rf "$tmpdir"
         """

@@ -30,6 +30,7 @@ jobs:
             fastp
             cutadapt
             sra-tools
+            pigz
             bowtie2
             bwa-mem2
             star
