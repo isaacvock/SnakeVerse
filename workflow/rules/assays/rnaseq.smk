@@ -124,20 +124,17 @@ rule featurecounts_exon_strict:
 
 rule gene_regions_saf:
     input:
-        gtf=lambda wildcards: config["genome"]["gtf"],
-        script=workflow_file("scripts/gtf_to_gene_saf.py")
+        gtf=lambda wildcards: config["genome"]["gtf"]
     output:
         saf=f"{RESULTS_DIR}/reference/annotation/{GENOME_SLUG}.gene_regions.saf"
     log:
         f"{RESULTS_DIR}/logs/featurecounts/gene_regions_saf.log"
     conda:
         workflow_file("envs/subread.yaml")
-    shell:
-        """
-        mkdir -p $(dirname {output.saf}) $(dirname {log})
-        python {input.script} \
-            --gtf {input.gtf} --output {output.saf} > {log} 2>&1
-        """
+    params:
+        project_root=PROJECT_ROOT
+    script:
+        workflow_file("scripts/gtf_to_gene_saf.py")
 
 
 rule featurecounts_full_gene:

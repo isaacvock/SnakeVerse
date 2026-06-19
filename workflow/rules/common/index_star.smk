@@ -27,6 +27,7 @@ rule star_index:
         STAR --runMode genomeGenerate \
             --runThreadN {threads} \
             --genomeDir {params.genome_dir} \
+            --outFileNamePrefix {params.genome_dir}/ \
             --genomeFastaFiles {input.fasta} \
             {params.gtf_arg} {params.rendered} {params.extra} > {log} 2>&1
         """

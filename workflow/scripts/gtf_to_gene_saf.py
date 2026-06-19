@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 import argparse
+import traceback
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 
 @dataclass
@@ -44,7 +46,7 @@ def update_span(spans: dict[str, Span], gene_id: str, chrom: str, start: int, en
         span.strand = "."
 
 
-def build_gene_saf(gtf: Path, output: Path) -> None:
+def build_gene_saf(gtf: Path, output: Path) -> int:
     gene_spans: dict[str, Span] = {}
     derived_spans: dict[str, Span] = {}
 
@@ -72,6 +74,32 @@ def build_gene_saf(gtf: Path, output: Path) -> None:
         for gene_id in sorted(derived_spans, key=lambda key: (derived_spans[key].chrom, derived_spans[key].start, key)):
             span = gene_spans.get(gene_id, derived_spans[gene_id])
             handle.write(f"{gene_id}\t{span.chrom}\t{span.start}\t{span.end}\t{span.strand}\n")
+    return len(derived_spans)
+
+
+def project_path(value: str | Path, project_root: Path) -> Path:
+    path = Path(value)
+    if path.is_absolute():
+        return path
+    return project_root / path
+
+
+def run_from_snakemake(snakemake_obj: Any) -> None:
+    project_root = Path(str(snakemake_obj.params.project_root))
+    gtf = project_path(str(snakemake_obj.input.gtf), project_root)
+    output = project_path(str(snakemake_obj.output.saf), project_root)
+    log = project_path(str(snakemake_obj.log[0]), project_root)
+
+    log.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        gene_count = build_gene_saf(gtf, output)
+    except Exception:
+        with log.open("w", encoding="utf-8") as handle:
+            traceback.print_exc(file=handle)
+        raise
+
+    with log.open("w", encoding="utf-8") as handle:
+        handle.write(f"Wrote {gene_count} gene regions to {output}\n")
 
 
 def main() -> int:
@@ -83,5 +111,7 @@ def main() -> int:
     return 0
 
 
-if __name__ == "__main__":
+if "snakemake" in globals():
+    run_from_snakemake(globals()["snakemake"])
+elif __name__ == "__main__":
     raise SystemExit(main())
