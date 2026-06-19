@@ -15,15 +15,25 @@ else:
 WORKFLOW_LIB_DIR = Path(workflow_file("lib/config.py")).parent
 sys.path.insert(0, str(WORKFLOW_LIB_DIR))
 
-WORKFLOW_CONFIG_MODULE_PATH = workflow_file("lib/config.py")
-WORKFLOW_CONFIG_SPEC = importlib.util.spec_from_file_location(
-    "snakeverse_config", WORKFLOW_CONFIG_MODULE_PATH
-)
-if WORKFLOW_CONFIG_SPEC is None or WORKFLOW_CONFIG_SPEC.loader is None:
-    raise ImportError(f"Could not import workflow config module from {WORKFLOW_CONFIG_MODULE_PATH}")
-snakeverse_config = importlib.util.module_from_spec(WORKFLOW_CONFIG_SPEC)
-sys.modules["snakeverse_config"] = snakeverse_config
-WORKFLOW_CONFIG_SPEC.loader.exec_module(snakeverse_config)
+WORKFLOW_LIB_MODULES = [
+    ("snakeverse_config", "lib/config.py"),
+    ("samples", "lib/samples.py"),
+    ("refs", "lib/refs.py"),
+    ("params", "lib/params.py"),
+    ("tracks", "lib/tracks.py"),
+    ("validation", "lib/validation.py"),
+]
+
+for module_name, module_path in WORKFLOW_LIB_MODULES:
+    source_path = workflow_file(module_path)
+    spec = importlib.util.spec_from_file_location(module_name, source_path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Could not import workflow module {module_name} from {source_path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
+    spec.loader.exec_module(module)
+
+snakeverse_config = sys.modules["snakeverse_config"]
 get_results_dir = snakeverse_config.get_results_dir
 resolve_config_from_mapping = snakeverse_config.resolve_config_from_mapping
 
