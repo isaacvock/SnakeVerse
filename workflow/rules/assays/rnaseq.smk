@@ -77,7 +77,7 @@ rule featurecounts:
         mem_mb=int(resource_value(config, "featurecounts", "mem_mb", 8192)),
         runtime_min=int(resource_value(config, "featurecounts", "runtime_min", 180))
     conda:
-        str(WORKFLOW_DIR / "envs" / "subread.yaml")
+        workflow_file("envs/subread.yaml")
     params:
         annotation=lambda wildcards: config["genome"]["gtf"],
         rendered=lambda wildcards: render_featurecounts_for_config(config, SAMPLES),
@@ -105,7 +105,7 @@ rule featurecounts_exon_strict:
         mem_mb=int(resource_value(config, "featurecounts", "mem_mb", 8192)),
         runtime_min=int(resource_value(config, "featurecounts", "runtime_min", 180))
     conda:
-        str(WORKFLOW_DIR / "envs" / "subread.yaml")
+        workflow_file("envs/subread.yaml")
     params:
         annotation=lambda wildcards: config["genome"]["gtf"],
         rendered=lambda wildcards: render_featurecounts_for_config(
@@ -125,13 +125,13 @@ rule featurecounts_exon_strict:
 rule gene_regions_saf:
     input:
         gtf=lambda wildcards: config["genome"]["gtf"],
-        script=str(WORKFLOW_DIR / "scripts" / "gtf_to_gene_saf.py")
+        script=workflow_file("scripts/gtf_to_gene_saf.py")
     output:
         saf=f"{RESULTS_DIR}/reference/annotation/{GENOME_SLUG}.gene_regions.saf"
     log:
         f"{RESULTS_DIR}/logs/featurecounts/gene_regions_saf.log"
     conda:
-        str(WORKFLOW_DIR / "envs" / "subread.yaml")
+        workflow_file("envs/subread.yaml")
     shell:
         """
         mkdir -p $(dirname {output.saf}) $(dirname {log})
@@ -156,7 +156,7 @@ rule featurecounts_full_gene:
         mem_mb=int(resource_value(config, "featurecounts", "mem_mb", 8192)),
         runtime_min=int(resource_value(config, "featurecounts", "runtime_min", 180))
     conda:
-        str(WORKFLOW_DIR / "envs" / "subread.yaml")
+        workflow_file("envs/subread.yaml")
     params:
         rendered=lambda wildcards: render_featurecounts_for_config(
             config,
@@ -183,7 +183,7 @@ if salmon_quant_enabled():
         log:
             f"{RESULTS_DIR}/logs/salmon/build_transcripts.log"
         conda:
-            str(WORKFLOW_DIR / "envs" / "salmon.yaml")
+            workflow_file("envs/salmon.yaml")
         shell:
             """
             mkdir -p $(dirname {output.fasta}) $(dirname {log})
@@ -207,7 +207,7 @@ if salmon_quant_enabled():
                 mem_mb=int(resource_value(config, "salmon", "mem_mb", 8192)),
                 runtime_min=int(resource_value(config, "salmon", "runtime_min", 180))
             conda:
-                str(WORKFLOW_DIR / "envs" / "salmon.yaml")
+                workflow_file("envs/salmon.yaml")
             params:
                 outdir=lambda wildcards: f"{RESULTS_DIR}/counts/salmon/{wildcards.sample}",
                 gene_map=lambda wildcards, input: f"--geneMap {input.gtf}",
@@ -235,7 +235,7 @@ if salmon_quant_enabled():
                 mem_mb=int(resource_value(config, "salmon", "mem_mb", 8192)),
                 runtime_min=int(resource_value(config, "salmon", "runtime_min", 180))
             conda:
-                str(WORKFLOW_DIR / "envs" / "salmon.yaml")
+                workflow_file("envs/salmon.yaml")
             params:
                 outdir=lambda wildcards: f"{RESULTS_DIR}/counts/salmon/{wildcards.sample}",
                 rendered=lambda wildcards: render_tool_params(config, "salmon"),
@@ -263,7 +263,7 @@ if rsem_quant_enabled():
             mem_mb=int(resource_value(config, "rsem_prepare_reference", "mem_mb", 8192)),
             runtime_min=int(resource_value(config, "rsem_prepare_reference", "runtime_min", 180))
         conda:
-            str(WORKFLOW_DIR / "envs" / "rsem.yaml")
+            workflow_file("envs/rsem.yaml")
         params:
             prefix=lambda wildcards: f"{RESULTS_DIR}/reference/rsem/{GENOME_SLUG}/{GENOME_SLUG}",
             rendered=lambda wildcards: render_tool_params(config, "rsem", section="prepare_reference"),
@@ -291,7 +291,7 @@ if rsem_quant_enabled():
                 mem_mb=int(resource_value(config, "rsem", "mem_mb", 8192)),
                 runtime_min=int(resource_value(config, "rsem", "runtime_min", 180))
             conda:
-                str(WORKFLOW_DIR / "envs" / "rsem.yaml")
+                workflow_file("envs/rsem.yaml")
             params:
                 reference_prefix=lambda wildcards: f"{RESULTS_DIR}/reference/rsem/{GENOME_SLUG}/{GENOME_SLUG}",
                 output_prefix=lambda wildcards: f"{RESULTS_DIR}/counts/rsem/{wildcards.sample}/{wildcards.sample}",
@@ -320,7 +320,7 @@ if rsem_quant_enabled():
                 mem_mb=int(resource_value(config, "rsem", "mem_mb", 8192)),
                 runtime_min=int(resource_value(config, "rsem", "runtime_min", 180))
             conda:
-                str(WORKFLOW_DIR / "envs" / "rsem.yaml")
+                workflow_file("envs/rsem.yaml")
             params:
                 reference_prefix=lambda wildcards: f"{RESULTS_DIR}/reference/rsem/{GENOME_SLUG}/{GENOME_SLUG}",
                 output_prefix=lambda wildcards: f"{RESULTS_DIR}/counts/rsem/{wildcards.sample}/{wildcards.sample}",

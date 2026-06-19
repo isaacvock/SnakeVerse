@@ -15,7 +15,7 @@ rule fastqc:
         mem_mb=int(resource_value(config, "fastqc", "mem_mb", 1024)),
         runtime_min=int(resource_value(config, "fastqc", "runtime_min", 30))
     conda:
-        str(WORKFLOW_DIR / "envs" / "fastqc.yaml")
+        workflow_file("envs/fastqc.yaml")
     params:
         rendered=lambda wildcards: render_tool_params(config, "fastqc"),
         extra=lambda wildcards: tool_extra(config, "fastqc")

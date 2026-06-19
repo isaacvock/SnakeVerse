@@ -20,7 +20,7 @@ if TRIMMING_TOOL == "fastp":
             mem_mb=int(resource_value(config, "fastp", "mem_mb", 4096)),
             runtime_min=int(resource_value(config, "fastp", "runtime_min", 120))
         conda:
-            str(WORKFLOW_DIR / "envs" / "fastp.yaml")
+            workflow_file("envs/fastp.yaml")
         params:
             layout=lambda wildcards: unit_layout(SAMPLES, wildcards.unit),
             rendered=lambda wildcards: render_tool_params(config, "fastp"),
@@ -56,7 +56,7 @@ elif TRIMMING_TOOL == "cutadapt":
             mem_mb=int(resource_value(config, "cutadapt", "mem_mb", 4096)),
             runtime_min=int(resource_value(config, "cutadapt", "runtime_min", 120))
         conda:
-            str(WORKFLOW_DIR / "envs" / "cutadapt.yaml")
+            workflow_file("envs/cutadapt.yaml")
         params:
             layout=lambda wildcards: unit_layout(SAMPLES, wildcards.unit),
             rendered=lambda wildcards: render_tool_params(config, "cutadapt"),

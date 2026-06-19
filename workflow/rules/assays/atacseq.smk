@@ -68,7 +68,7 @@ rule macs3_callpeak:
         mem_mb=int(resource_value(config, "macs3", "mem_mb", 4096)),
         runtime_min=int(resource_value(config, "macs3", "runtime_min", 120))
     conda:
-        str(WORKFLOW_DIR / "envs" / "macs3.yaml")
+        workflow_file("envs/macs3.yaml")
     params:
         outdir=lambda wildcards, output: Path(output.narrowpeak).parent.as_posix(),
         name=lambda wildcards: wildcards.sample,
@@ -107,7 +107,7 @@ rule atac_frip:
         mem_mb=int(resource_value(config, "atac_frip", "mem_mb", 1024)),
         runtime_min=int(resource_value(config, "atac_frip", "runtime_min", 30))
     conda:
-        str(WORKFLOW_DIR / "envs" / "bedtools.yaml")
+        workflow_file("envs/bedtools.yaml")
     shell:
         """
         mkdir -p $(dirname {output}) $(dirname {log})
@@ -136,7 +136,7 @@ rule atac_library_complexity:
         mem_mb=int(resource_value(config, "atac_library_complexity", "mem_mb", 1024)),
         runtime_min=int(resource_value(config, "atac_library_complexity", "runtime_min", 30))
     conda:
-        str(WORKFLOW_DIR / "envs" / "samtools.yaml")
+        workflow_file("envs/samtools.yaml")
     shell:
         """
         mkdir -p $(dirname {output}) $(dirname {log})
@@ -177,7 +177,7 @@ rule atac_fragment_lengths:
         mem_mb=int(resource_value(config, "atac_fragment_lengths", "mem_mb", 1024)),
         runtime_min=int(resource_value(config, "atac_fragment_lengths", "runtime_min", 30))
     conda:
-        str(WORKFLOW_DIR / "envs" / "samtools.yaml")
+        workflow_file("envs/samtools.yaml")
     shell:
         """
         mkdir -p $(dirname {output}) $(dirname {log})
@@ -202,7 +202,7 @@ rule atac_tss_enrichment:
         mem_mb=int(resource_value(config, "atac_tss_enrichment", "mem_mb", 1024)),
         runtime_min=int(resource_value(config, "atac_tss_enrichment", "runtime_min", 30))
     conda:
-        str(WORKFLOW_DIR / "envs" / "bedtools.yaml")
+        workflow_file("envs/bedtools.yaml")
     params:
         flank=lambda wildcards: int(config.get("atac", {}).get("tss_flank_bp", 1000)),
         center=lambda wildcards: int(config.get("atac", {}).get("tss_center_bp", 50))

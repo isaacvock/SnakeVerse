@@ -16,7 +16,7 @@ rule bam_coverage:
         mem_mb=int(resource_value(config, "deeptools", "mem_mb", 4096)),
         runtime_min=int(resource_value(config, "deeptools", "runtime_min", 120))
     conda:
-        str(WORKFLOW_DIR / "envs" / "deeptools.yaml")
+        workflow_file("envs/deeptools.yaml")
     params:
         rendered=lambda wildcards: render_tool_params(
             config,

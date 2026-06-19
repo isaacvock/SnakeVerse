@@ -14,7 +14,7 @@ rule sra_fastq:
         mem_mb=int(resource_value(config, "sra_tools", "mem_mb", 4096)),
         runtime_min=int(resource_value(config, "sra_tools", "runtime_min", 240))
     conda:
-        str(WORKFLOW_DIR / "envs" / "sra_tools.yaml")
+        workflow_file("envs/sra_tools.yaml")
     params:
         accession=lambda wildcards: sample_by_unit(SAMPLES, wildcards.unit).get("sra_id", ""),
         extra=lambda wildcards: tool_extra(config, "sra_tools")

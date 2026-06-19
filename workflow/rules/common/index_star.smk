@@ -15,7 +15,7 @@ rule star_index:
         mem_mb=int(resource_value(config, "star_index", "mem_mb", 16000)),
         runtime_min=int(resource_value(config, "star_index", "runtime_min", 240))
     conda:
-        str(WORKFLOW_DIR / "envs" / "star.yaml")
+        workflow_file("envs/star.yaml")
     params:
         genome_dir=lambda wildcards: generated_index_dir(config, RESULTS_DIR, "star"),
         gtf_arg=lambda wildcards: star_gtf_arg(config),
@@ -30,4 +30,3 @@ rule star_index:
             --genomeFastaFiles {input.fasta} \
             {params.gtf_arg} {params.rendered} {params.extra} > {log} 2>&1
         """
-

@@ -19,7 +19,7 @@ rule bowtie2_align:
         mem_mb=int(resource_value(config, "bowtie2", "mem_mb", 8192)),
         runtime_min=int(resource_value(config, "bowtie2", "runtime_min", 240))
     conda:
-        str(WORKFLOW_DIR / "envs" / "bowtie2.yaml")
+        workflow_file("envs/bowtie2.yaml")
     params:
         index=lambda wildcards: aligner_index_prefix(config, RESULTS_DIR, "bowtie2"),
         reads=lambda wildcards, input: bowtie2_reads_arg(input.r1, input.r2),

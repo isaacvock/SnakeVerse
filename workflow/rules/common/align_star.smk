@@ -21,7 +21,7 @@ if needs_transcriptome_bam():
             mem_mb=int(resource_value(config, "star", "mem_mb", 32000)),
             runtime_min=int(resource_value(config, "star", "runtime_min", 360))
         conda:
-            str(WORKFLOW_DIR / "envs" / "star.yaml")
+            workflow_file("envs/star.yaml")
         params:
             genome_dir=lambda wildcards: aligner_index_prefix(config, RESULTS_DIR, "star"),
             reads=lambda wildcards, input: star_reads_arg(input.r1, input.r2),
@@ -58,7 +58,7 @@ else:
             mem_mb=int(resource_value(config, "star", "mem_mb", 32000)),
             runtime_min=int(resource_value(config, "star", "runtime_min", 360))
         conda:
-            str(WORKFLOW_DIR / "envs" / "star.yaml")
+            workflow_file("envs/star.yaml")
         params:
             genome_dir=lambda wildcards: aligner_index_prefix(config, RESULTS_DIR, "star"),
             reads=lambda wildcards, input: star_reads_arg(input.r1, input.r2),

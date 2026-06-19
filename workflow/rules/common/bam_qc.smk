@@ -16,7 +16,7 @@ rule samtools_bam_qc:
         mem_mb=int(resource_value(config, "samtools_qc", "mem_mb", 2048)),
         runtime_min=int(resource_value(config, "samtools_qc", "runtime_min", 60))
     conda:
-        str(WORKFLOW_DIR / "envs" / "samtools.yaml")
+        workflow_file("envs/samtools.yaml")
     shell:
         """
         mkdir -p $(dirname {output.flagstat}) $(dirname {log})

@@ -19,7 +19,7 @@ rule bwa_mem2_align:
         mem_mb=int(resource_value(config, "bwa_mem2", "mem_mb", 8192)),
         runtime_min=int(resource_value(config, "bwa_mem2", "runtime_min", 240))
     conda:
-        str(WORKFLOW_DIR / "envs" / "bwa_mem2.yaml")
+        workflow_file("envs/bwa_mem2.yaml")
     params:
         index=lambda wildcards: aligner_index_prefix(config, RESULTS_DIR, "bwa_mem2"),
         reads=lambda wildcards, input: bwa_mem2_reads_arg(input.r1, input.r2),
@@ -35,4 +35,3 @@ rule bwa_mem2_align:
             | samtools sort -@ {threads} {params.sort_args} -o {output.bam} - 2>> {log}
         samtools index {output.bam} {output.bai} 2>> {log}
         """
-

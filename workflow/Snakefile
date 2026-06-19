@@ -1,16 +1,32 @@
 from pathlib import Path
+import importlib.util
 import sys
 
 configfile: "config/config.yaml"
 
-try:
-    WORKFLOW_DIR = Path(workflow.basedir).resolve()
-except AttributeError:
+if hasattr(workflow, "source_path"):
+    WORKFLOW_DIR = Path(workflow.source_path("Snakefile")).resolve().parent
+    workflow_file = lambda path: str(Path(workflow.source_path(path)).resolve())
+else:
     WORKFLOW_DIR = Path("workflow").resolve()
+    workflow_file = lambda path: str((WORKFLOW_DIR / path).resolve())
 
-sys.path.insert(0, str(WORKFLOW_DIR / "lib"))
 
-from config import get_results_dir, resolve_config_from_mapping
+WORKFLOW_LIB_DIR = Path(workflow_file("lib/config.py")).parent
+sys.path.insert(0, str(WORKFLOW_LIB_DIR))
+
+WORKFLOW_CONFIG_MODULE_PATH = workflow_file("lib/config.py")
+WORKFLOW_CONFIG_SPEC = importlib.util.spec_from_file_location(
+    "snakeverse_config", WORKFLOW_CONFIG_MODULE_PATH
+)
+if WORKFLOW_CONFIG_SPEC is None or WORKFLOW_CONFIG_SPEC.loader is None:
+    raise ImportError(f"Could not import workflow config module from {WORKFLOW_CONFIG_MODULE_PATH}")
+snakeverse_config = importlib.util.module_from_spec(WORKFLOW_CONFIG_SPEC)
+sys.modules["snakeverse_config"] = snakeverse_config
+WORKFLOW_CONFIG_SPEC.loader.exec_module(snakeverse_config)
+get_results_dir = snakeverse_config.get_results_dir
+resolve_config_from_mapping = snakeverse_config.resolve_config_from_mapping
+
 from samples import (
     alignment_fastq_1,
     alignment_fastq_2,
@@ -93,37 +109,37 @@ rule all:
 
 
 if has_sra_samples(SAMPLES):
-    include: str(WORKFLOW_DIR / "rules" / "common" / "sra_download.smk")
+    include: workflow_file("rules/common/sra_download.smk")
 
-include: str(WORKFLOW_DIR / "rules" / "common" / "fastq_qc.smk")
+include: workflow_file("rules/common/fastq_qc.smk")
 
 if step_enabled("trimming", False):
-    include: str(WORKFLOW_DIR / "rules" / "common" / "trimming.smk")
+    include: workflow_file("rules/common/trimming.smk")
 
 ALIGNER = config.get("alignment", {}).get("tool")
 if ALIGNER == "bowtie2":
-    include: str(WORKFLOW_DIR / "rules" / "common" / "index_bowtie2.smk")
-    include: str(WORKFLOW_DIR / "rules" / "common" / "align_bowtie2.smk")
+    include: workflow_file("rules/common/index_bowtie2.smk")
+    include: workflow_file("rules/common/align_bowtie2.smk")
 elif ALIGNER == "star":
-    include: str(WORKFLOW_DIR / "rules" / "common" / "index_star.smk")
-    include: str(WORKFLOW_DIR / "rules" / "common" / "align_star.smk")
+    include: workflow_file("rules/common/index_star.smk")
+    include: workflow_file("rules/common/align_star.smk")
 elif ALIGNER == "bwa_mem2":
-    include: str(WORKFLOW_DIR / "rules" / "common" / "index_bwa_mem2.smk")
-    include: str(WORKFLOW_DIR / "rules" / "common" / "align_bwa_mem2.smk")
+    include: workflow_file("rules/common/index_bwa_mem2.smk")
+    include: workflow_file("rules/common/align_bwa_mem2.smk")
 else:
     raise ValueError(f"Unsupported or missing alignment.tool: {ALIGNER}")
 
-include: str(WORKFLOW_DIR / "rules" / "common" / "bam_filter.smk")
-include: str(WORKFLOW_DIR / "rules" / "common" / "mark_duplicates.smk")
-include: str(WORKFLOW_DIR / "rules" / "common" / "bam_qc.smk")
-include: str(WORKFLOW_DIR / "rules" / "common" / "coverage.smk")
-include: str(WORKFLOW_DIR / "rules" / "common" / "multiqc.smk")
+include: workflow_file("rules/common/bam_filter.smk")
+include: workflow_file("rules/common/mark_duplicates.smk")
+include: workflow_file("rules/common/bam_qc.smk")
+include: workflow_file("rules/common/coverage.smk")
+include: workflow_file("rules/common/multiqc.smk")
 
 if config["assay"] == "generic":
-    include: str(WORKFLOW_DIR / "rules" / "assays" / "generic.smk")
+    include: workflow_file("rules/assays/generic.smk")
 elif config["assay"] == "rnaseq":
-    include: str(WORKFLOW_DIR / "rules" / "assays" / "rnaseq.smk")
+    include: workflow_file("rules/assays/rnaseq.smk")
 elif config["assay"] == "atacseq":
-    include: str(WORKFLOW_DIR / "rules" / "assays" / "atacseq.smk")
+    include: workflow_file("rules/assays/atacseq.smk")
 else:
     raise ValueError(f"Unsupported assay: {config['assay']}")

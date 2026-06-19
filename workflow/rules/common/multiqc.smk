@@ -14,7 +14,7 @@ rule multiqc:
         mem_mb=int(resource_value(config, "multiqc", "mem_mb", 2048)),
         runtime_min=int(resource_value(config, "multiqc", "runtime_min", 60))
     conda:
-        str(WORKFLOW_DIR / "envs" / "multiqc.yaml")
+        workflow_file("envs/multiqc.yaml")
     params:
         search_dir=lambda wildcards, output: Path(output.html).parents[1].as_posix(),
         outdir=lambda wildcards, output: Path(output.html).parent.as_posix(),

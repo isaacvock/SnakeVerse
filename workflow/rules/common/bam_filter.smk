@@ -16,7 +16,7 @@ rule samtools_filter:
         mem_mb=int(resource_value(config, "samtools_filter", "mem_mb", 4096)),
         runtime_min=int(resource_value(config, "samtools_filter", "runtime_min", 120))
     conda:
-        str(WORKFLOW_DIR / "envs" / "samtools.yaml")
+        workflow_file("envs/samtools.yaml")
     params:
         view_args=lambda wildcards: render_tool_params(
             config,

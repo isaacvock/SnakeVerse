@@ -15,7 +15,7 @@ rule bowtie2_index:
         mem_mb=int(resource_value(config, "bowtie2_index", "mem_mb", 4096)),
         runtime_min=int(resource_value(config, "bowtie2_index", "runtime_min", 120))
     conda:
-        str(WORKFLOW_DIR / "envs" / "bowtie2.yaml")
+        workflow_file("envs/bowtie2.yaml")
     params:
         prefix=lambda wildcards: generated_index_prefix(config, RESULTS_DIR, "bowtie2"),
         rendered=lambda wildcards: render_tool_params(config, "bowtie2", section="index"),
@@ -26,4 +26,3 @@ rule bowtie2_index:
         bowtie2-build --threads {threads} {params.rendered} {params.extra} \
             {input.fasta} {params.prefix} > {log} 2>&1
         """
-

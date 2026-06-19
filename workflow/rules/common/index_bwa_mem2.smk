@@ -15,7 +15,7 @@ rule bwa_mem2_index:
         mem_mb=int(resource_value(config, "bwa_mem2_index", "mem_mb", 4096)),
         runtime_min=int(resource_value(config, "bwa_mem2_index", "runtime_min", 120))
     conda:
-        str(WORKFLOW_DIR / "envs" / "bwa_mem2.yaml")
+        workflow_file("envs/bwa_mem2.yaml")
     params:
         prefix=lambda wildcards: generated_index_prefix(config, RESULTS_DIR, "bwa_mem2"),
         rendered=lambda wildcards: render_tool_params(config, "bwa_mem2", section="index"),
@@ -26,4 +26,3 @@ rule bwa_mem2_index:
         bwa-mem2 index {params.rendered} {params.extra} -p {params.prefix} \
             {input.fasta} > {log} 2>&1
         """
-

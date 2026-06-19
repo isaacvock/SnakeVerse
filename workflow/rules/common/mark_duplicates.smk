@@ -17,7 +17,7 @@ rule samtools_mark_duplicates:
         mem_mb=int(resource_value(config, "samtools_markdup", "mem_mb", 4096)),
         runtime_min=int(resource_value(config, "samtools_markdup", "runtime_min", 120))
     conda:
-        str(WORKFLOW_DIR / "envs" / "samtools.yaml")
+        workflow_file("envs/samtools.yaml")
     params:
         layout=lambda wildcards: sample_layout(SAMPLES, wildcards.sample)
     shell:
