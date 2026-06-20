@@ -1,0 +1,101 @@
+# Bulk RNA-seq recipe using STAR and featureCounts.
+schema_version: 2
+
+created_from:
+  recipe: star_featurecounts
+  version: 1
+
+project:
+  name: example_project
+  run_name: "{{RUN_NAME}}"
+
+assay: rnaseq
+samples: config/samples/{{RUN_NAME}}.tsv
+reference: config/references/{{GENOME}}.yaml
+results_dir: results/{{RUN_NAME}}
+
+modules:
+  sra_download:
+    enabled: false
+
+  fastq_qc:
+    enabled: true
+
+  trimming:
+    enabled: true
+    tool: fastp
+    # REQUIRED REVIEW: choose auto, sequences, or none.
+    adapters:
+      mode: auto
+      read1:
+      read2:
+
+  alignment:
+    enabled: true
+    tool: star
+    # Keep STAR's transcript-coordinate BAM as a deliverable. Salmon or RSEM
+    # will request it automatically even when this is false.
+    transcriptome_bam: false
+
+  mark_duplicates:
+    enabled: false
+
+  bam_filter:
+    enabled: true
+    min_mapq: 10
+    required_flags:
+    excluded_flags: 1804
+    keep_duplicates: true
+    exclude_contigs: []
+
+  bam_qc:
+    enabled: true
+
+  # Quantification semantics live here, not in featurecounts.yaml.
+  gene_counts:
+    enabled: true
+    tool: featurecounts
+    modes:
+      standard: true
+      exon_strict: false
+      full_gene: false
+    feature_type: exon
+    attribute_type: gene_id
+    strandedness: sample
+    paired_end: auto
+    count_read_pairs: auto
+    require_both_ends_mapped: false
+    count_multimapping_reads: false
+    count_overlapping_features: false
+
+  salmon_quantification:
+    enabled: false
+    gene_results: true
+    isoform_results: true
+
+  rsem_quantification:
+    enabled: false
+    gene_results: true
+    isoform_results: true
+
+  coverage:
+    enabled: true
+    strand_mode: sample
+
+  multiqc:
+    enabled: true
+
+resources:
+  fastqc: {threads: 1, mem_mb: 1024, runtime_min: 30}
+  sra_tools: {threads: 4, mem_mb: 4096, runtime_min: 240}
+  fastp: {threads: 4, mem_mb: 4096, runtime_min: 120}
+  star: {threads: 12, mem_mb: 32000, runtime_min: 360}
+  star_index: {threads: 8, mem_mb: 32000, runtime_min: 480}
+  samtools_filter: {threads: 4, mem_mb: 4096, runtime_min: 120}
+  samtools_qc: {threads: 2, mem_mb: 2048, runtime_min: 60}
+  featurecounts: {threads: 8, mem_mb: 8192, runtime_min: 180}
+  salmon: {threads: 8, mem_mb: 8192, runtime_min: 180}
+  rsem_prepare_reference: {threads: 4, mem_mb: 8192, runtime_min: 180}
+  rsem: {threads: 8, mem_mb: 16384, runtime_min: 360}
+  deeptools: {threads: 4, mem_mb: 4096, runtime_min: 120}
+  multiqc: {threads: 1, mem_mb: 2048, runtime_min: 60}

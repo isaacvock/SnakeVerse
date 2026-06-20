@@ -1,0 +1,14 @@
+# Editable cutadapt profile.
+tool: cutadapt
+version: "4"
+
+params:
+  quality_cutoff: "20,20"
+  minimum_length: 20
+  error_rate: 0.1
+
+# Adapter policy and sequences are owned by modules.trimming.adapters in the
+# run config so they cannot silently conflict with this file.
+
+# Appended verbatim to the cutadapt command.
+extra: ""

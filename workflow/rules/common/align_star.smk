@@ -1,4 +1,4 @@
-from params import render_tool_params, resource_value, tool_extra
+from params import render_star_alignment, resource_value, tool_extra
 from refs import aligner_index_inputs, aligner_index_prefix
 from samples import star_reads_arg
 
@@ -26,7 +26,7 @@ if needs_transcriptome_bam():
             genome_dir=lambda wildcards: aligner_index_prefix(config, RESULTS_DIR, "star"),
             reads=lambda wildcards, input: star_reads_arg(input.r1, input.r2),
             prefix=lambda wildcards: f"{RESULTS_DIR}/star/{wildcards.sample}/",
-            star_args=lambda wildcards: render_tool_params(config, "star", section="align"),
+            star_args=lambda wildcards: render_star_alignment(config, True),
             extra=lambda wildcards: tool_extra(config, "star")
         shell:
             """
@@ -63,7 +63,7 @@ else:
             genome_dir=lambda wildcards: aligner_index_prefix(config, RESULTS_DIR, "star"),
             reads=lambda wildcards, input: star_reads_arg(input.r1, input.r2),
             prefix=lambda wildcards: f"{RESULTS_DIR}/star/{wildcards.sample}/",
-            star_args=lambda wildcards: render_tool_params(config, "star", section="align"),
+            star_args=lambda wildcards: render_star_alignment(config, False),
             extra=lambda wildcards: tool_extra(config, "star")
         shell:
             """

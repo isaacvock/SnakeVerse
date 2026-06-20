@@ -5,9 +5,9 @@ from typing import Any
 
 
 INDEX_KEYS = {
-    "bowtie2": "bowtie2_index",
-    "star": "star_index",
-    "bwa_mem2": "bwa_mem2_index",
+    "bowtie2": "bowtie2",
+    "star": "star",
+    "bwa_mem2": "bwa_mem2",
 }
 
 STAR_INDEX_FILES = (
@@ -23,7 +23,7 @@ STAR_INDEX_FILES = (
 
 
 def genome_name(config: dict[str, Any]) -> str:
-    return str(config.get("genome", {}).get("name") or "genome")
+    return str(config.get("reference", {}).get("name") or "genome")
 
 
 def genome_slug(config: dict[str, Any]) -> str:
@@ -34,7 +34,8 @@ def configured_index(config: dict[str, Any], aligner: str) -> str:
     key = INDEX_KEYS.get(aligner)
     if not key:
         return ""
-    return str(config.get("genome", {}).get(key) or "").rstrip("/")
+    indexes = config.get("reference", {}).get("indexes", {}) or {}
+    return str(indexes.get(key) or "").rstrip("/")
 
 
 def index_is_configured(config: dict[str, Any], aligner: str) -> bool:
@@ -109,11 +110,11 @@ def aligner_index_inputs(config: dict[str, Any], results_dir: str, aligner: str)
 
 
 def genome_fasta(config: dict[str, Any]) -> str:
-    return str(config.get("genome", {}).get("fasta") or "")
+    return str(config.get("reference", {}).get("fasta") or "")
 
 
 def genome_gtf(config: dict[str, Any]) -> str:
-    return str(config.get("genome", {}).get("gtf") or "")
+    return str(config.get("reference", {}).get("gtf") or "")
 
 
 def star_gtf_arg(config: dict[str, Any]) -> str:

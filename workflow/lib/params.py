@@ -4,7 +4,11 @@ import shlex
 from collections.abc import Mapping
 from typing import Any
 
-from samples import featurecounts_count_read_pairs, featurecounts_paired_end
+from samples import (
+    featurecounts_count_read_pairs,
+    featurecounts_paired_end,
+    featurecounts_strand,
+)
 
 
 def _dash(name: str) -> str:
@@ -144,16 +148,38 @@ def render_star(params: Mapping[str, Any]) -> str:
     return " ".join(parts)
 
 
+def render_star_alignment(config: Mapping[str, Any], transcriptome_bam: bool) -> str:
+    """Render STAR align settings while honoring the run-owned BAM output switch."""
+    profile_params = config.get("tools", {}).get("star", {}).get("params", {}) or {}
+    if isinstance(profile_params.get("align"), Mapping):
+        params = dict(profile_params.get("align", {}) or {})
+    else:
+        params = {
+            key: value
+            for key, value in profile_params.items()
+            if key not in {"align", "index"}
+        }
+    if not transcriptome_bam and "quantMode" in params:
+        modes = str(params["quantMode"]).split()
+        params["quantMode"] = " ".join(mode for mode in modes if mode != "TranscriptomeSAM")
+    return render_star(params)
+
+
 def render_samtools_view(params: Mapping[str, Any]) -> str:
     parts: list[str] = []
     if "min_mapq" in params:
         _append_flag(parts, "-q", params["min_mapq"])
     if "required_flags" in params:
         _append_flag(parts, "-f", params["required_flags"])
-    if "excluded_flags" in params:
-        _append_flag(parts, "-F", params["excluded_flags"])
-    if params.get("keep_duplicates") is False and "excluded_flags" not in params:
-        _append_flag(parts, "-F", 1024)
+    excluded_flags = params.get("excluded_flags")
+    if excluded_flags not in (None, ""):
+        excluded_flags = int(excluded_flags)
+    if params.get("keep_duplicates") is True and excluded_flags is not None:
+        excluded_flags &= ~1024
+    elif params.get("keep_duplicates") is False:
+        excluded_flags = int(excluded_flags or 0) | 1024
+    if excluded_flags:
+        _append_flag(parts, "-F", excluded_flags)
     return " ".join(parts)
 
 
@@ -193,10 +219,21 @@ def render_featurecounts_for_config(
     drop_keys: tuple[str, ...] = (),
 ) -> str:
     params = dict(config.get("tools", {}).get("featurecounts", {}).get("params", {}) or {})
+    module = config.get("modules", {}).get("gene_counts", {}) or {}
+    for key in (
+        "feature_type",
+        "attribute_type",
+        "require_both_ends_mapped",
+        "count_multimapping_reads",
+        "count_overlapping_features",
+    ):
+        if key in module:
+            params[key] = module[key]
     for key in drop_keys:
         params.pop(key, None)
     params.update(
         {
+            "strand": featurecounts_strand(samples, config),
             "paired_end": featurecounts_paired_end(samples, config),
             "count_read_pairs": featurecounts_count_read_pairs(samples, config),
         }
@@ -204,6 +241,35 @@ def render_featurecounts_for_config(
     if overrides:
         params.update(overrides)
     return render_featurecounts(params)
+
+
+def trimming_adapter_params(
+    config: Mapping[str, Any], tool: str, paired: bool
+) -> dict[str, Any]:
+    """Render the run-owned adapter policy into tool-specific parameters."""
+    trimming = (config.get("modules", {}) or {}).get("trimming", {}) or {}
+    adapters = trimming.get("adapters", {}) or {}
+    mode = adapters.get("mode", "none")
+    if mode == "none":
+        return {}
+    if mode == "auto":
+        return {"detect_adapter_for_pe": True} if tool == "fastp" and paired else {}
+    if mode != "sequences":
+        return {}
+
+    read1 = adapters.get("read1")
+    read2 = adapters.get("read2")
+    if tool == "fastp":
+        return {
+            "adapter_sequence": read1,
+            "adapter_sequence_r2": read2 if paired else None,
+        }
+    if tool == "cutadapt":
+        return {
+            "adapter_r1": read1,
+            "adapter_r2": read2 if paired else None,
+        }
+    return {}
 
 
 def render_salmon(params: Mapping[str, Any]) -> str:

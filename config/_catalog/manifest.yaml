@@ -1,0 +1,50 @@
+catalog_version: 2
+
+assays:
+  generic:
+    description: "Generic FASTQ-to-BAM workflow for custom assays."
+    recipes:
+      fastq_to_bam:
+        description: "FASTQ QC, trimming, Bowtie2 alignment, BAM filtering, QC, and coverage."
+        run_template: recipes/generic_fastq_to_bam.yaml
+        sample_template: samples/generic.tsv
+        tools:
+          - fastqc
+          - fastp
+          - bowtie2
+          - samtools
+          - deeptools
+          - multiqc
+
+  rnaseq:
+    description: "Bulk RNA-seq workflow."
+    recipes:
+      star_featurecounts:
+        description: "STAR alignment plus featureCounts gene quantification."
+        run_template: recipes/rnaseq_star_featurecounts.yaml
+        sample_template: samples/rnaseq.tsv
+        tools:
+          - fastqc
+          - fastp
+          - star
+          - samtools
+          - featurecounts
+          - deeptools
+          - multiqc
+
+  atacseq:
+    description: "ATAC-seq chromatin accessibility workflow."
+    recipes:
+      encode4_bowtie2_macs3:
+        description: "ENCODE4-oriented Bowtie2 alignment, filtering, MACS3 peaks, signal, and QC."
+        run_template: recipes/atacseq_encode4.yaml
+        sample_template: samples/atacseq.tsv
+        tools:
+          - fastqc
+          - fastp
+          - bowtie2
+          - samtools
+          - bedtools
+          - macs3
+          - deeptools
+          - multiqc

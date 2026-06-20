@@ -11,42 +11,45 @@ from samples import (
 
 ATACSEQ_TARGETS = []
 
-if output_enabled("fastq_qc"):
+if module_enabled("fastq_qc"):
     ATACSEQ_TARGETS.extend(fastqc_targets(SAMPLES, RESULTS_DIR))
 
-if output_enabled("trimmed_fastq") and step_enabled("trimming", False):
+if module_enabled("trimming"):
     ATACSEQ_TARGETS.extend(trimmed_fastq_targets(SAMPLES, RESULTS_DIR))
 
-if output_enabled("raw_bam"):
+if module_enabled("alignment"):
     ATACSEQ_TARGETS.extend(raw_bam_targets(SAMPLES, RESULTS_DIR))
 
-if output_enabled("filtered_bam") and step_enabled("bam_filter", True):
+if module_enabled("mark_duplicates"):
+    ATACSEQ_TARGETS.extend(markdup_bam_targets(SAMPLES, RESULTS_DIR))
+
+if module_enabled("bam_filter"):
     ATACSEQ_TARGETS.extend(filtered_bam_targets(SAMPLES, RESULTS_DIR))
 
-if output_enabled("bam_qc") and step_enabled("bam_qc", True):
+if module_enabled("bam_qc"):
     ATACSEQ_TARGETS.extend(bam_qc_targets(SAMPLES, RESULTS_DIR))
 
-if output_enabled("bigwig") and step_enabled("coverage", False):
+if module_enabled("coverage"):
     ATACSEQ_TARGETS.extend(bigwig_targets(SAMPLES, RESULTS_DIR))
 
-if output_enabled("peaks") and step_enabled("peak_calling", True):
+if module_enabled("peak_calling"):
     ATACSEQ_TARGETS.extend(narrowpeak_targets(SAMPLES, RESULTS_DIR))
 
-if output_enabled("frip") and step_enabled("frip", True):
+if module_enabled("frip"):
     ATACSEQ_TARGETS.extend(frip_targets(SAMPLES, RESULTS_DIR))
 
-if output_enabled("library_complexity") and step_enabled("library_complexity", True):
+if module_enabled("library_complexity"):
     ATACSEQ_TARGETS.extend(library_complexity_targets(SAMPLES, RESULTS_DIR))
 
-if output_enabled("fragment_lengths") and step_enabled("fragment_lengths", True):
+if module_enabled("fragment_lengths"):
     ATACSEQ_TARGETS.extend(fragment_length_targets(SAMPLES, RESULTS_DIR))
 
-if output_enabled("tss_enrichment") and step_enabled("tss_enrichment", True):
+if module_enabled("tss_enrichment"):
     ATACSEQ_TARGETS.extend(tss_enrichment_targets(SAMPLES, RESULTS_DIR))
 
 MULTIQC_INPUTS.extend(ATACSEQ_TARGETS)
 
-if output_enabled("multiqc"):
+if module_enabled("multiqc"):
     ATACSEQ_TARGETS.append(f"{RESULTS_DIR}/multiqc/multiqc_report.html")
 
 ASSAY_TARGETS.extend(ATACSEQ_TARGETS)
@@ -79,8 +82,8 @@ rule macs3_callpeak:
             section="callpeak",
             overrides={
                 "genome_size": config.get("tools", {}).get("macs3", {}).get("params", {}).get("callpeak", {}).get("genome_size")
-                or config.get("genome", {}).get("macs3_genome_size")
-                or config.get("genome", {}).get("effective_genome_size")
+                or config.get("reference", {}).get("macs3_genome_size")
+                or config.get("reference", {}).get("effective_genome_size")
             },
         ),
         extra=lambda wildcards: tool_extra(config, "macs3")
@@ -190,8 +193,8 @@ rule atac_tss_enrichment:
     input:
         bam=lambda wildcards: final_bam_path(wildcards.sample),
         bai=lambda wildcards: final_bai_path(wildcards.sample),
-        tss=lambda wildcards: config.get("genome", {}).get("tss_bed"),
-        chrom_sizes=lambda wildcards: config.get("genome", {}).get("chrom_sizes")
+        tss=lambda wildcards: config.get("reference", {}).get("tss_bed"),
+        chrom_sizes=lambda wildcards: config.get("reference", {}).get("chrom_sizes")
     output:
         f"{RESULTS_DIR}/qc/atac/{{sample}}.tss_enrichment.txt"
     log:
@@ -204,8 +207,8 @@ rule atac_tss_enrichment:
     conda:
         workflow_file("envs/bedtools.yaml")
     params:
-        flank=lambda wildcards: int(config.get("atac", {}).get("tss_flank_bp", 1000)),
-        center=lambda wildcards: int(config.get("atac", {}).get("tss_center_bp", 50))
+        flank=lambda wildcards: int(module_settings("tss_enrichment").get("flank_bp", 1000)),
+        center=lambda wildcards: int(module_settings("tss_enrichment").get("center_bp", 50))
     shell:
         """
         set -euo pipefail

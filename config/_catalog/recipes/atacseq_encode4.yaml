@@ -1,0 +1,93 @@
+# ENCODE4-oriented ATAC-seq recipe. Full replicated IDR is not yet included.
+schema_version: 2
+
+created_from:
+  recipe: encode4_bowtie2_macs3
+  version: 1
+
+project:
+  name: example_project
+  run_name: "{{RUN_NAME}}"
+
+assay: atacseq
+samples: config/samples/{{RUN_NAME}}.tsv
+reference: config/references/{{GENOME}}.yaml
+results_dir: results/{{RUN_NAME}}
+
+modules:
+  sra_download:
+    enabled: false
+
+  fastq_qc:
+    enabled: true
+
+  trimming:
+    enabled: true
+    tool: fastp
+    # REQUIRED REVIEW: ATAC libraries commonly use Nextera adapters. Use auto
+    # or provide the exact sequences used by the library preparation.
+    adapters:
+      mode: auto
+      read1:
+      read2:
+
+  alignment:
+    enabled: true
+    tool: bowtie2
+
+  mark_duplicates:
+    enabled: true
+
+  # ENCODE-oriented filtering: high-quality, nonduplicate, nonmitochondrial reads.
+  bam_filter:
+    enabled: true
+    min_mapq: 30
+    required_flags:
+    excluded_flags: 1804
+    keep_duplicates: false
+    exclude_contigs: [chrM, MT]
+
+  bam_qc:
+    enabled: true
+
+  coverage:
+    enabled: true
+    strand_mode: none
+
+  peak_calling:
+    enabled: true
+    tool: macs3
+
+  frip:
+    enabled: true
+
+  library_complexity:
+    enabled: true
+
+  fragment_lengths:
+    enabled: true
+
+  tss_enrichment:
+    enabled: false
+    flank_bp: 1000
+    center_bp: 50
+
+  multiqc:
+    enabled: true
+
+resources:
+  fastqc: {threads: 1, mem_mb: 1024, runtime_min: 30}
+  sra_tools: {threads: 4, mem_mb: 4096, runtime_min: 240}
+  fastp: {threads: 4, mem_mb: 4096, runtime_min: 120}
+  bowtie2: {threads: 8, mem_mb: 8192, runtime_min: 240}
+  bowtie2_index: {threads: 4, mem_mb: 8192, runtime_min: 240}
+  samtools_markdup: {threads: 4, mem_mb: 4096, runtime_min: 120}
+  samtools_filter: {threads: 4, mem_mb: 4096, runtime_min: 120}
+  samtools_qc: {threads: 2, mem_mb: 2048, runtime_min: 60}
+  deeptools: {threads: 4, mem_mb: 4096, runtime_min: 120}
+  macs3: {threads: 1, mem_mb: 4096, runtime_min: 120}
+  atac_frip: {threads: 1, mem_mb: 1024, runtime_min: 30}
+  atac_library_complexity: {threads: 1, mem_mb: 1024, runtime_min: 30}
+  atac_fragment_lengths: {threads: 1, mem_mb: 1024, runtime_min: 30}
+  atac_tss_enrichment: {threads: 1, mem_mb: 1024, runtime_min: 30}
+  multiqc: {threads: 1, mem_mb: 2048, runtime_min: 60}

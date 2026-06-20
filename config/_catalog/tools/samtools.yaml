@@ -1,0 +1,13 @@
+# Editable samtools profile.
+tool: samtools
+version: "1.20"
+
+params:
+  sort:
+    memory_per_thread: 2G
+
+# BAM inclusion/exclusion policy is owned by modules.bam_filter in the run
+# config. This file controls only samtools-specific execution details.
+
+# Appended verbatim to samtools view in the filtering rule.
+extra: ""

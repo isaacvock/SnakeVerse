@@ -22,7 +22,7 @@ rule bam_coverage:
             config,
             "deeptools",
             overrides={
-                "effective_genome_size": config.get("genome", {}).get("effective_genome_size")
+                "effective_genome_size": config.get("reference", {}).get("effective_genome_size")
             },
         ),
         strand=lambda wildcards: coverage_strand_arg(config, SAMPLES, wildcards.sample),

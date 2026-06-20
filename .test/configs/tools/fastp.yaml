@@ -1,0 +1,8 @@
+tool: fastp
+version: "0.23"
+
+params:
+  qualified_quality_phred: 20
+  length_required: 20
+
+extra: ""

@@ -23,14 +23,14 @@ rule samtools_filter:
             "samtools",
             section="filter",
             overrides={
-                "min_mapq": config.get("filtering", {}).get("min_mapq"),
-                "required_flags": config.get("filtering", {}).get("required_flags"),
-                "excluded_flags": config.get("filtering", {}).get("excluded_flags"),
-                "keep_duplicates": config.get("filtering", {}).get("keep_duplicates"),
+                "min_mapq": config.get("modules", {}).get("bam_filter", {}).get("min_mapq"),
+                "required_flags": config.get("modules", {}).get("bam_filter", {}).get("required_flags"),
+                "excluded_flags": config.get("modules", {}).get("bam_filter", {}).get("excluded_flags"),
+                "keep_duplicates": config.get("modules", {}).get("bam_filter", {}).get("keep_duplicates"),
             },
         ),
-        excluded_contigs=lambda wildcards: ",".join(config.get("filtering", {}).get("exclude_contigs", []) or []),
-        blacklist=lambda wildcards: config.get("genome", {}).get("blacklist", "") or "",
+        excluded_contigs=lambda wildcards: ",".join(config.get("modules", {}).get("bam_filter", {}).get("exclude_contigs", []) or []),
+        blacklist=lambda wildcards: config.get("reference", {}).get("blacklist", "") or "",
         extra=lambda wildcards: tool_extra(config, "samtools")
     shell:
         """

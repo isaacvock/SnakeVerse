@@ -1,29 +1,48 @@
-project:
-  name: snakeverse_ci
-  run_name: atacseq
-
+schema_version: 2
+created_from: {recipe: encode4_bowtie2_macs3, version: 1}
+project: {name: snakeverse_ci, run_name: atacseq}
 assay: atacseq
-preset: encode4_bowtie2_macs3
-
 samples: .test/configs/samples/atacseq.tsv
-
-profile_stack:
-  - .test/configs/profiles/assays/atacseq.yaml
-  - .test/configs/profiles/protocols/atacseq_encode4.yaml
-  - .test/configs/profiles/genomes/test_genome.yaml
-
+reference: .test/configs/references/test_genome.yaml
 results_dir: .test/results/atacseq
 
-outputs:
-  fastq_qc: true
-  trimmed_fastq: true
-  raw_bam: true
-  filtered_bam: true
-  bam_qc: true
-  bigwig: true
-  peaks: true
-  frip: true
-  library_complexity: true
-  fragment_lengths: true
-  tss_enrichment: true
-  multiqc: true
+modules:
+  sra_download: {enabled: false}
+  fastq_qc: {enabled: true}
+  trimming:
+    enabled: true
+    tool: fastp
+    adapters: {mode: auto, read1: null, read2: null}
+  alignment: {enabled: true, tool: bowtie2}
+  mark_duplicates: {enabled: true}
+  bam_filter:
+    enabled: true
+    min_mapq: 10
+    required_flags: null
+    excluded_flags: 1804
+    keep_duplicates: false
+    exclude_contigs: [chrM, MT]
+  bam_qc: {enabled: true}
+  coverage: {enabled: true, strand_mode: none}
+  peak_calling: {enabled: true, tool: macs3}
+  frip: {enabled: true}
+  library_complexity: {enabled: true}
+  fragment_lengths: {enabled: true}
+  tss_enrichment: {enabled: true, flank_bp: 1000, center_bp: 50}
+  multiqc: {enabled: true}
+
+resources:
+  fastqc: {threads: 1, mem_mb: 512, runtime_min: 15}
+  fastp: {threads: 2, mem_mb: 1024, runtime_min: 30}
+  bowtie2: {threads: 2, mem_mb: 2048, runtime_min: 60}
+  bowtie2_index: {threads: 2, mem_mb: 2048, runtime_min: 60}
+  samtools_markdup: {threads: 2, mem_mb: 1024, runtime_min: 30}
+  samtools_filter: {threads: 2, mem_mb: 1024, runtime_min: 30}
+  samtools_qc: {threads: 1, mem_mb: 512, runtime_min: 15}
+  deeptools: {threads: 2, mem_mb: 1024, runtime_min: 30}
+  macs3: {threads: 1, mem_mb: 1024, runtime_min: 30}
+  atac_frip: {threads: 1, mem_mb: 512, runtime_min: 15}
+  atac_library_complexity: {threads: 1, mem_mb: 512, runtime_min: 15}
+  atac_fragment_lengths: {threads: 1, mem_mb: 512, runtime_min: 15}
+  atac_tss_enrichment: {threads: 1, mem_mb: 512, runtime_min: 15}
+  multiqc: {threads: 1, mem_mb: 512, runtime_min: 15}

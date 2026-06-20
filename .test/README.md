@@ -8,6 +8,11 @@ configs. Those configs resolve only files under `.test/configs/`, so CI can
 lint and dry-run the workflow without changing the user-facing `config/`
 directory.
 
+Each fixture run is a complete schema-v2 configuration. Shared test references
+live in `.test/configs/references/`, and the union of tools selected across the
+fixture runs lives in `.test/configs/tools/`; there are no assay or protocol
+merge profiles.
+
 The ATAC-seq fixture under `.test/data/ATACseq/` contains paired-end ENCODE
 K562 reads restricted to chr21.
 

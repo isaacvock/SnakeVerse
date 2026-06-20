@@ -1,0 +1,13 @@
+# Editable fastp profile.
+tool: fastp
+version: "0.23"
+
+params:
+  qualified_quality_phred: 20
+  length_required: 20
+
+# Adapter policy and sequences are owned by modules.trimming.adapters in the
+# run config so they cannot silently conflict with this file.
+
+# Appended verbatim to the fastp command.
+extra: ""

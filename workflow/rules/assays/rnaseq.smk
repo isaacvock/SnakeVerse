@@ -4,59 +4,62 @@ from samples import sample_layout
 
 RNASEQ_TARGETS = []
 
-if output_enabled("fastq_qc"):
+if module_enabled("fastq_qc"):
     RNASEQ_TARGETS.extend(fastqc_targets(SAMPLES, RESULTS_DIR))
 
-if output_enabled("trimmed_fastq") and step_enabled("trimming", False):
+if module_enabled("trimming"):
     RNASEQ_TARGETS.extend(trimmed_fastq_targets(SAMPLES, RESULTS_DIR))
 
-if output_enabled("raw_bam"):
+if module_enabled("alignment"):
     RNASEQ_TARGETS.extend(raw_bam_targets(SAMPLES, RESULTS_DIR))
 
-if output_enabled("filtered_bam") and step_enabled("bam_filter", True):
+if module_enabled("mark_duplicates"):
+    RNASEQ_TARGETS.extend(markdup_bam_targets(SAMPLES, RESULTS_DIR))
+
+if module_enabled("bam_filter"):
     RNASEQ_TARGETS.extend(filtered_bam_targets(SAMPLES, RESULTS_DIR))
 
-if output_enabled("bam_qc") and step_enabled("bam_qc", True):
+if module_enabled("bam_qc"):
     RNASEQ_TARGETS.extend(bam_qc_targets(SAMPLES, RESULTS_DIR))
 
-if output_enabled("gene_counts"):
+if gene_count_mode_enabled("standard"):
     RNASEQ_TARGETS.append(f"{RESULTS_DIR}/counts/featurecounts/gene_counts.txt")
 
-if output_enabled("exon_strict_counts"):
+if gene_count_mode_enabled("exon_strict"):
     RNASEQ_TARGETS.append(f"{RESULTS_DIR}/counts/featurecounts/exon_strict_counts.txt")
 
-if output_enabled("full_gene_counts"):
+if gene_count_mode_enabled("full_gene"):
     RNASEQ_TARGETS.append(f"{RESULTS_DIR}/counts/featurecounts/full_gene_counts.txt")
 
-if output_enabled("transcriptome_bam"):
+if module_settings("alignment").get("transcriptome_bam", False):
     RNASEQ_TARGETS.extend(transcriptome_bam_targets(SAMPLES, RESULTS_DIR))
 
-if output_enabled("salmon_isoform_quant"):
+if salmon_result_enabled("isoform_results"):
     RNASEQ_TARGETS.extend(
         f"{RESULTS_DIR}/counts/salmon/{sample}/quant.sf" for sample in SAMPLE_IDS
     )
 
-if output_enabled("salmon_gene_quant"):
+if salmon_result_enabled("gene_results"):
     RNASEQ_TARGETS.extend(
         f"{RESULTS_DIR}/counts/salmon/{sample}/quant.genes.sf" for sample in SAMPLE_IDS
     )
 
-if output_enabled("rsem_isoform_quant"):
+if rsem_result_enabled("isoform_results"):
     RNASEQ_TARGETS.extend(
         f"{RESULTS_DIR}/counts/rsem/{sample}/{sample}.isoforms.results" for sample in SAMPLE_IDS
     )
 
-if output_enabled("rsem_gene_quant"):
+if rsem_result_enabled("gene_results"):
     RNASEQ_TARGETS.extend(
         f"{RESULTS_DIR}/counts/rsem/{sample}/{sample}.genes.results" for sample in SAMPLE_IDS
     )
 
-if output_enabled("bigwig") and step_enabled("coverage", False):
+if module_enabled("coverage"):
     RNASEQ_TARGETS.extend(bigwig_targets(SAMPLES, RESULTS_DIR))
 
 MULTIQC_INPUTS.extend(RNASEQ_TARGETS)
 
-if output_enabled("multiqc"):
+if module_enabled("multiqc"):
     RNASEQ_TARGETS.append(f"{RESULTS_DIR}/multiqc/multiqc_report.html")
 
 ASSAY_TARGETS.extend(RNASEQ_TARGETS)
@@ -79,7 +82,7 @@ rule featurecounts:
     conda:
         workflow_file("envs/subread.yaml")
     params:
-        annotation=lambda wildcards: config["genome"]["gtf"],
+        annotation=lambda wildcards: config["reference"]["gtf"],
         rendered=lambda wildcards: render_featurecounts_for_config(config, SAMPLES),
         extra=lambda wildcards: tool_extra(config, "featurecounts")
     shell:
@@ -107,7 +110,7 @@ rule featurecounts_exon_strict:
     conda:
         workflow_file("envs/subread.yaml")
     params:
-        annotation=lambda wildcards: config["genome"]["gtf"],
+        annotation=lambda wildcards: config["reference"]["gtf"],
         rendered=lambda wildcards: render_featurecounts_for_config(
             config,
             SAMPLES,
@@ -124,7 +127,7 @@ rule featurecounts_exon_strict:
 
 rule gene_regions_saf:
     input:
-        gtf=lambda wildcards: config["genome"]["gtf"]
+        gtf=lambda wildcards: config["reference"]["gtf"]
     output:
         saf=f"{RESULTS_DIR}/reference/annotation/{GENOME_SLUG}.gene_regions.saf"
     log:
@@ -173,8 +176,8 @@ rule featurecounts_full_gene:
 if salmon_quant_enabled():
     rule salmon_transcripts:
         input:
-            fasta=lambda wildcards: config["genome"]["fasta"],
-            gtf=lambda wildcards: config["genome"]["gtf"]
+            fasta=lambda wildcards: config["reference"]["fasta"],
+            gtf=lambda wildcards: config["reference"]["gtf"]
         output:
             fasta=f"{RESULTS_DIR}/reference/salmon/{GENOME_SLUG}.transcripts.fa"
         log:
@@ -187,12 +190,12 @@ if salmon_quant_enabled():
             gffread {input.gtf} -g {input.fasta} -w {output.fasta} > {log} 2>&1
             """
 
-    if output_enabled("salmon_gene_quant"):
+    if salmon_result_enabled("gene_results"):
         rule salmon_quant:
             input:
                 bam=f"{RESULTS_DIR}/bam/transcriptome/{{sample}}.bam",
                 transcripts=f"{RESULTS_DIR}/reference/salmon/{GENOME_SLUG}.transcripts.fa",
-                gtf=lambda wildcards: config["genome"]["gtf"]
+                gtf=lambda wildcards: config["reference"]["gtf"]
             output:
                 isoforms=f"{RESULTS_DIR}/counts/salmon/{{sample}}/quant.sf",
                 genes=f"{RESULTS_DIR}/counts/salmon/{{sample}}/quant.genes.sf"
@@ -248,8 +251,8 @@ if salmon_quant_enabled():
 if rsem_quant_enabled():
     rule rsem_reference:
         input:
-            fasta=lambda wildcards: config["genome"]["fasta"],
-            gtf=lambda wildcards: config["genome"]["gtf"]
+            fasta=lambda wildcards: config["reference"]["fasta"],
+            gtf=lambda wildcards: config["reference"]["gtf"]
         output:
             marker=touch(f"{RESULTS_DIR}/reference/rsem/{GENOME_SLUG}/.snakeverse_rsem_reference.done")
         log:
@@ -272,7 +275,7 @@ if rsem_quant_enabled():
                 {input.fasta} {params.prefix} > {log} 2>&1
             """
 
-    if output_enabled("rsem_gene_quant"):
+    if rsem_result_enabled("gene_results"):
         rule rsem_quant:
             input:
                 bam=f"{RESULTS_DIR}/bam/transcriptome/{{sample}}.bam",

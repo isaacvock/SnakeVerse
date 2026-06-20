@@ -65,10 +65,12 @@ jobs:
       - name: Helper script checks
         run: |
           python config/bin/ngsflow.py list assays
-          python config/bin/ngsflow.py list presets --assay generic
-          python config/bin/ngsflow.py list presets --assay rnaseq
-          python config/bin/ngsflow.py list presets --assay atacseq
+          python config/bin/ngsflow.py list recipes --assay generic
+          python config/bin/ngsflow.py list recipes --assay rnaseq
+          python config/bin/ngsflow.py list recipes --assay atacseq
           python config/bin/ngsflow.py explain --configfile .test/configs/generic.yaml
+          python config/bin/ngsflow.py explain alignment --configfile .test/configs/generic.yaml
+          python config/bin/ngsflow.py explain trimming --configfile .test/configs/generic.yaml
           python config/bin/ngsflow.py validate --configfile .test/configs/generic.yaml
           python config/bin/ngsflow.py explain --configfile .test/configs/rnaseq.yaml
           python config/bin/ngsflow.py validate --configfile .test/configs/rnaseq.yaml
@@ -76,6 +78,25 @@ jobs:
           python config/bin/ngsflow.py validate --configfile .test/configs/atacseq.yaml
           python config/bin/ngsflow.py explain --configfile .test/configs/generic_bwa_mem2.yaml
           python config/bin/ngsflow.py validate --configfile .test/configs/generic_bwa_mem2.yaml
+
+      - name: Recipe initialization smoke test
+        run: |
+          smoke_dir="$(mktemp -d)"
+          cp -a config "$smoke_dir/config"
+          cd "$smoke_dir"
+          python config/bin/ngsflow.py init-run \
+            --assay rnaseq \
+            --recipe star_featurecounts \
+            --genome hg38 \
+            --run-name smoke \
+            --overwrite
+          python config/bin/ngsflow.py explain alignment
+          test -f config/runs/smoke.yaml
+          test -f config/samples/smoke.tsv
+          test -f config/references/hg38.yaml
+          test -f config/tools/star.yaml
+          test -f config/tools/featurecounts.yaml
+          test ! -e config/tools/sra_tools.yaml
 
       - name: Snakemake lint
         run: |

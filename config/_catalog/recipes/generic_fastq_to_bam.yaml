@@ -1,0 +1,71 @@
+# Generic FASTQ-to-BAM recipe. This becomes config/runs/<run-name>.yaml.
+schema_version: 2
+
+# Provenance only: the recipe does not participate in runtime configuration.
+created_from:
+  recipe: fastq_to_bam
+  version: 1
+
+project:
+  name: example_project
+  run_name: "{{RUN_NAME}}"
+
+assay: generic
+samples: config/samples/{{RUN_NAME}}.tsv
+reference: config/references/{{GENOME}}.yaml
+results_dir: results/{{RUN_NAME}}
+
+# Each module has one switch. Enabled modules produce their canonical outputs;
+# required upstream work is inferred by Snakemake.
+modules:
+  sra_download:
+    enabled: false
+
+  fastq_qc:
+    enabled: true
+
+  trimming:
+    enabled: true
+    tool: fastp
+    # REQUIRED REVIEW: auto lets fastp detect adapters; sequences uses the
+    # explicit values below; none performs quality/length filtering only.
+    adapters:
+      mode: auto
+      read1:
+      read2:
+
+  alignment:
+    enabled: true
+    tool: bowtie2
+
+  mark_duplicates:
+    enabled: false
+
+  bam_filter:
+    enabled: true
+    min_mapq: 10
+    required_flags:
+    excluded_flags: 1804
+    keep_duplicates: true
+    exclude_contigs: []
+
+  bam_qc:
+    enabled: true
+
+  coverage:
+    enabled: true
+    strand_mode: none
+
+  multiqc:
+    enabled: true
+
+resources:
+  fastqc: {threads: 1, mem_mb: 1024, runtime_min: 30}
+  sra_tools: {threads: 4, mem_mb: 4096, runtime_min: 240}
+  fastp: {threads: 4, mem_mb: 4096, runtime_min: 120}
+  bowtie2: {threads: 8, mem_mb: 8192, runtime_min: 240}
+  bowtie2_index: {threads: 4, mem_mb: 8192, runtime_min: 240}
+  samtools_filter: {threads: 4, mem_mb: 4096, runtime_min: 120}
+  samtools_qc: {threads: 2, mem_mb: 2048, runtime_min: 60}
+  deeptools: {threads: 4, mem_mb: 4096, runtime_min: 120}
+  multiqc: {threads: 1, mem_mb: 2048, runtime_min: 60}

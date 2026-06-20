@@ -1,9 +1,0 @@
-tool: rsem
-version: "1"
-
-params:
-  prepare_reference: {}
-  quant: {}
-
-extra: ""
-

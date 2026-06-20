@@ -1,4 +1,4 @@
-from params import render_tool_params, resource_value, tool_extra
+from params import render_tool_params, resource_value, tool_extra, trimming_adapter_params
 from samples import fastq_for_read, optional_fastq_for_read, unit_layout
 
 
@@ -23,7 +23,13 @@ if TRIMMING_TOOL == "fastp":
             workflow_file("envs/fastp.yaml")
         params:
             layout=lambda wildcards: unit_layout(SAMPLES, wildcards.unit),
-            rendered=lambda wildcards: render_tool_params(config, "fastp"),
+            rendered=lambda wildcards: render_tool_params(
+                config,
+                "fastp",
+                overrides=trimming_adapter_params(
+                    config, "fastp", unit_layout(SAMPLES, wildcards.unit) == "paired"
+                ),
+            ),
             extra=lambda wildcards: tool_extra(config, "fastp")
         shell:
             """
@@ -59,7 +65,13 @@ elif TRIMMING_TOOL == "cutadapt":
             workflow_file("envs/cutadapt.yaml")
         params:
             layout=lambda wildcards: unit_layout(SAMPLES, wildcards.unit),
-            rendered=lambda wildcards: render_tool_params(config, "cutadapt"),
+            rendered=lambda wildcards: render_tool_params(
+                config,
+                "cutadapt",
+                overrides=trimming_adapter_params(
+                    config, "cutadapt", unit_layout(SAMPLES, wildcards.unit) == "paired"
+                ),
+            ),
             extra=lambda wildcards: tool_extra(config, "cutadapt")
         shell:
             """

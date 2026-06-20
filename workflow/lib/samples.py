@@ -202,6 +202,17 @@ def raw_bam_targets(samples: list[dict[str, str]], results_dir: str) -> list[str
     ]
 
 
+def markdup_bam_targets(samples: list[dict[str, str]], results_dir: str) -> list[str]:
+    return [
+        item
+        for sample in sample_ids(samples)
+        for item in [
+            f"{results_dir}/bam/markdup/{sample}.bam",
+            f"{results_dir}/bam/markdup/{sample}.bam.bai",
+        ]
+    ]
+
+
 def filtered_bam_targets(samples: list[dict[str, str]], results_dir: str) -> list[str]:
     return [
         item
@@ -317,7 +328,7 @@ def bwa_mem2_reads_arg(r1: Any, r2: Any) -> str:
 
 
 def featurecounts_paired_end(samples: list[dict[str, str]], config: dict[str, Any]) -> bool:
-    params = config.get("tools", {}).get("featurecounts", {}).get("params", {})
+    params = config.get("modules", {}).get("gene_counts", {}) or {}
     value = params.get("paired_end", "auto")
     layout = run_layout(samples)
     if layout == "mixed":
@@ -330,8 +341,28 @@ def featurecounts_paired_end(samples: list[dict[str, str]], config: dict[str, An
 
 
 def featurecounts_count_read_pairs(samples: list[dict[str, str]], config: dict[str, Any]) -> bool:
-    params = config.get("tools", {}).get("featurecounts", {}).get("params", {})
+    params = config.get("modules", {}).get("gene_counts", {}) or {}
     value = params.get("count_read_pairs", "auto")
     if value == "auto":
         return featurecounts_paired_end(samples, config)
     return bool(value)
+
+
+def featurecounts_strand(samples: list[dict[str, str]], config: dict[str, Any]) -> int:
+    """Translate run-level strandedness semantics to featureCounts -s."""
+    module = config.get("modules", {}).get("gene_counts", {}) or {}
+    value = module.get("strandedness", "sample")
+    if value == "sample":
+        values = {row.get("strandedness", "unstranded") or "unstranded" for row in samples}
+        if len(values) != 1:
+            raise ValueError(
+                "featureCounts runs all samples together and requires one strandedness; "
+                f"sample sheet contains {sorted(values)}"
+            )
+        value = values.pop()
+    mapping = {"unstranded": 0, "forward": 1, "reverse": 2, 0: 0, 1: 1, 2: 2}
+    if value not in mapping:
+        raise ValueError(
+            "modules.gene_counts.strandedness must be sample, unstranded, forward, or reverse"
+        )
+    return mapping[value]

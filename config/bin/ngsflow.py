@@ -1,33 +1,67 @@
 #!/usr/bin/env python3
+"""Local configuration helper for SnakeVerse.
+
+This script materializes editable files from config/_catalog. It is a helper,
+not a workflow runner: Snakemake reads the generated files directly.
+"""
+
 from __future__ import annotations
 
 import argparse
 import csv
 import io
 import sys
-from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
 try:
     import yaml
-except ImportError:  # pragma: no cover - exercised only in missing dependency envs.
+except ImportError:  # pragma: no cover
     yaml = None
+
+
+INDEX_FILES = {
+    "star": (
+        "Genome",
+        "SA",
+        "SAindex",
+        "chrLength.txt",
+        "chrName.txt",
+        "chrNameLength.txt",
+        "chrStart.txt",
+        "genomeParameters.txt",
+    ),
+    "bowtie2": (".1.bt2", ".2.bt2", ".3.bt2", ".4.bt2", ".rev.1.bt2", ".rev.2.bt2"),
+    "bwa_mem2": (".0123", ".amb", ".ann", ".bwt.2bit.64", ".pac"),
+}
+ADAPTER_TOOL_KEYS = {
+    "fastp": {"detect_adapter_for_pe", "adapter_sequence", "adapter_sequence_r2"},
+    "cutadapt": {"adapter_r1", "adapter_r2"},
+}
+FEATURECOUNTS_RUN_KEYS = {
+    "feature_type",
+    "attribute_type",
+    "strand",
+    "strandedness",
+    "paired_end",
+    "count_read_pairs",
+    "require_both_ends_mapped",
+    "count_multimapping_reads",
+    "count_overlapping_features",
+}
 
 
 def require_yaml() -> None:
     if yaml is None:
         raise SystemExit(
-            "PyYAML is required to read SnakeVerse YAML files. "
-            "Install it in the active environment or use the snakeverse-dev conda env."
+            "PyYAML is required. Install it in the active environment or use "
+            "the snakeverse-dev conda environment."
         )
 
 
 def script_paths() -> tuple[Path, Path, Path]:
     config_root = Path(__file__).resolve().parents[1]
-    project_root = config_root.parent
-    shipped_root = config_root / "_ngsflow"
-    return project_root, config_root, shipped_root
+    return config_root.parent, config_root, config_root / "_catalog"
 
 
 def load_yaml(path: str | Path) -> dict[str, Any]:
@@ -42,563 +76,521 @@ def load_yaml(path: str | Path) -> dict[str, Any]:
     return data
 
 
-def deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
-    merged = deepcopy(base)
-    for key, value in override.items():
-        if (
-            key in merged
-            and isinstance(merged[key], dict)
-            and isinstance(value, dict)
-        ):
-            merged[key] = deep_merge(merged[key], value)
-        else:
-            merged[key] = deepcopy(value)
-    return merged
-
-
 def project_path(value: str | Path, project_root: Path) -> Path:
     path = Path(value)
-    if path.is_absolute():
-        return path
-    return (project_root / path).resolve()
-
-
-INDEX_KEYS = {
-    "bowtie2": "bowtie2_index",
-    "star": "star_index",
-    "bwa_mem2": "bwa_mem2_index",
-}
-
-STAR_INDEX_FILES = (
-    "Genome",
-    "SA",
-    "SAindex",
-    "chrLength.txt",
-    "chrName.txt",
-    "chrNameLength.txt",
-    "chrStart.txt",
-    "genomeParameters.txt",
-)
-
-
-def configured_index_is_ready(
-    genome: dict[str, Any], aligner: str, project_root: Path
-) -> bool:
-    configured = str(genome.get(INDEX_KEYS.get(aligner, "")) or "").rstrip("/")
-    if not configured:
-        return False
-
-    index_path = project_path(configured, project_root)
-    if aligner == "star":
-        return all((index_path / name).exists() for name in STAR_INDEX_FILES)
-    if aligner == "bowtie2":
-        small_index = (".1.bt2", ".2.bt2", ".3.bt2", ".4.bt2", ".rev.1.bt2", ".rev.2.bt2")
-        large_index = tuple(suffix + "l" for suffix in small_index)
-        return all(Path(str(index_path) + suffix).exists() for suffix in small_index) or all(
-            Path(str(index_path) + suffix).exists() for suffix in large_index
-        )
-    if aligner == "bwa_mem2":
-        suffixes = (".0123", ".amb", ".ann", ".bwt.2bit.64", ".pac")
-        return all(Path(str(index_path) + suffix).exists() for suffix in suffixes)
-    return index_path.exists()
+    return path if path.is_absolute() else (project_root / path).resolve()
 
 
 def display_path(path: Path, project_root: Path) -> str:
     try:
-        return path.relative_to(project_root).as_posix()
+        return path.resolve().relative_to(project_root.resolve()).as_posix()
     except ValueError:
-        return path.as_posix()
+        return path.resolve().as_posix()
 
 
-def manifest() -> dict[str, Any]:
-    _, _, shipped_root = script_paths()
-    return load_yaml(shipped_root / "manifest.yaml")
+def catalog_manifest() -> dict[str, Any]:
+    return load_yaml(script_paths()[2] / "manifest.yaml")
 
 
 def assay_entry(assay: str) -> dict[str, Any]:
-    assays = manifest().get("assays", {})
+    assays = catalog_manifest().get("assays", {})
     if assay not in assays:
-        raise SystemExit(f"Unknown assay '{assay}'. Run: python config/bin/ngsflow.py list assays")
+        raise ValueError(
+            f"Unknown assay '{assay}'. Run: python config/bin/ngsflow.py list assays"
+        )
     return assays[assay]
 
 
-def preset_entry(assay: str, preset: str) -> dict[str, Any]:
-    entry = assay_entry(assay)
-    presets = entry.get("presets", {})
-    if preset not in presets:
-        raise SystemExit(
-            f"Unknown preset '{preset}' for assay '{assay}'. "
-            f"Run: python config/bin/ngsflow.py list presets --assay {assay}"
+def recipe_entry(assay: str, recipe: str) -> dict[str, Any]:
+    recipes = assay_entry(assay).get("recipes", {})
+    if recipe not in recipes:
+        raise ValueError(
+            f"Unknown recipe '{recipe}' for assay '{assay}'. Run: "
+            f"python config/bin/ngsflow.py list recipes --assay {assay}"
         )
-    return presets[preset]
+    return recipes[recipe]
 
 
 def render_template(text: str, replacements: dict[str, str]) -> str:
-    rendered = text
     for key, value in replacements.items():
-        rendered = rendered.replace("{{" + key + "}}", value)
-    return rendered
+        text = text.replace("{{" + key + "}}", value)
+    return text
 
 
-def planned_copy(src: Path, dst: Path, replacements: dict[str, str] | None = None) -> tuple[Path, Path, dict[str, str] | None]:
-    return src, dst, replacements
-
-
-def write_text_from_template(
-    src: Path,
-    dst: Path,
-    replacements: dict[str, str] | None,
+def materialize(
+    source: Path,
+    destination: Path,
+    replacements: dict[str, str],
     overwrite: bool,
     skip_existing: bool,
 ) -> str:
-    existed = dst.exists()
-    if dst.exists() and not overwrite:
+    existed = destination.exists()
+    if existed and not overwrite:
         if skip_existing:
-            return f"skip existing {dst}"
-        raise FileExistsError(f"Refusing to overwrite existing file: {dst}")
-
-    dst.parent.mkdir(parents=True, exist_ok=True)
-    text = src.read_text(encoding="utf-8")
-    if replacements:
-        text = render_template(text, replacements)
-    dst.write_text(text, encoding="utf-8")
-    action = "overwrite" if existed and overwrite else "write"
-    return f"{action} {dst}"
+            return f"skip  {destination}"
+        raise FileExistsError(
+            f"Refusing to overwrite existing file: {destination}. "
+            "Use --skip-existing to keep it or --overwrite to replace it."
+        )
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_text(
+        render_template(source.read_text(encoding="utf-8"), replacements),
+        encoding="utf-8",
+    )
+    return f"{'update' if existed else 'create'} {destination}"
 
 
 def write_active_pointer(config_root: Path, run_name: str) -> Path:
-    active_config = config_root / "config.yaml"
-    active_config.write_text(
+    pointer = config_root / "config.yaml"
+    pointer.write_text(
         "# Active SnakeVerse run pointer.\n"
+        "# Switch runs with: python config/bin/ngsflow.py activate-run <run-name>\n"
         f"run_config: config/runs/{run_name}.yaml\n",
         encoding="utf-8",
     )
-    return active_config
+    return pointer
 
 
 def resolve_config(configfile: str | Path) -> dict[str, Any]:
     project_root, _, _ = script_paths()
-    config_path = project_path(configfile, project_root)
-    pointer = load_yaml(config_path)
-    run_config_value = pointer.get("run_config")
-    if not run_config_value:
-        raise ValueError(f"{display_path(config_path, project_root)} must define run_config")
+    pointer_path = project_path(configfile, project_root)
+    pointer = load_yaml(pointer_path)
+    run_value = pointer.get("run_config")
+    if not run_value:
+        raise ValueError(f"{display_path(pointer_path, project_root)} must define run_config")
+    run_path = project_path(str(run_value), project_root)
+    run = load_yaml(run_path)
+    if run.get("schema_version") != 2:
+        raise ValueError(
+            f"Run config must use schema_version: 2: {display_path(run_path, project_root)}"
+        )
 
-    run_config_path = project_path(run_config_value, project_root)
-    run_config = load_yaml(run_config_path)
+    reference_value = run.get("reference")
+    if not reference_value:
+        raise ValueError(f"Run config must define reference: {display_path(run_path, project_root)}")
+    reference_path = project_path(str(reference_value), project_root)
+    reference_document = load_yaml(reference_path)
+    reference = reference_document.get("reference")
+    if not isinstance(reference, dict):
+        raise ValueError(f"Reference file must contain a top-level reference mapping: {reference_path}")
 
-    resolved: dict[str, Any] = {}
-    loaded_profiles: list[str] = []
-    for profile_value in run_config.get("profile_stack", []) or []:
-        profile_path = project_path(profile_value, project_root)
-        profile = load_yaml(profile_path)
-        resolved = deep_merge(resolved, profile)
-        loaded_profiles.append(display_path(profile_path, project_root))
-
-    tools_dir = config_path.parent / "profiles" / "tools"
+    config_root = pointer_path.parent
     tools: dict[str, dict[str, Any]] = {}
-    if tools_dir.exists():
-        for tool_path in sorted(tools_dir.glob("*.yaml")):
-            profile = load_yaml(tool_path)
-            tools[str(profile.get("tool") or tool_path.stem)] = profile
+    tool_files: dict[str, str] = {}
+    for tool_path in sorted((config_root / "tools").glob("*.yaml")):
+        tool_config = load_yaml(tool_path)
+        name = str(tool_config.get("tool") or tool_path.stem)
+        if name in tools:
+            raise ValueError(f"Duplicate active tool configuration for '{name}'")
+        tools[name] = tool_config
+        tool_files[name] = display_path(tool_path, project_root)
 
-    resolved = deep_merge(resolved, {"tools": tools})
-    resolved = deep_merge(resolved, pointer)
-    resolved = deep_merge(resolved, run_config)
+    resolved = dict(run)
+    resolved["reference"] = reference
+    resolved["tools"] = tools
     resolved["_ngsflow"] = {
         "project_root": project_root.as_posix(),
-        "configfile": display_path(config_path, project_root),
-        "run_config": display_path(run_config_path, project_root),
-        "loaded_profiles": loaded_profiles,
-        "loaded_tool_profiles": sorted(tools),
+        "configfile": display_path(pointer_path, project_root),
+        "run_config": display_path(run_path, project_root),
+        "reference_file": display_path(reference_path, project_root),
+        "tool_files": tool_files,
     }
     return resolved
 
 
-def required_sample_columns(assay: str) -> list[str]:
-    if assay == "rnaseq":
-        return [
-            "sample_id",
-            "unit_id",
-            "fastq_1",
-            "condition",
-            "replicate",
-            "strandedness",
-        ]
-    if assay == "atacseq":
-        return ["sample_id", "unit_id", "fastq_1", "condition", "replicate"]
-    return ["sample_id", "unit_id", "fastq_1"]
+def module(config: dict[str, Any], name: str) -> dict[str, Any]:
+    value = (config.get("modules") or {}).get(name, {})
+    return value if isinstance(value, dict) else {}
 
 
-def output_enabled(config: dict[str, Any], name: str) -> bool:
-    return bool((config.get("outputs") or {}).get(name, False))
+def module_enabled(config: dict[str, Any], name: str) -> bool:
+    return bool(module(config, name).get("enabled", False))
 
 
-def featurecounts_enabled(config: dict[str, Any]) -> bool:
-    return any(
-        output_enabled(config, name)
-        for name in ("gene_counts", "exon_strict_counts", "full_gene_counts")
-    )
+def required_tools(config: dict[str, Any], rows: list[dict[str, str]]) -> list[str]:
+    tools: list[str] = []
+    if module_enabled(config, "fastq_qc"):
+        tools.append("fastqc")
+    if module_enabled(config, "sra_download") and any(row.get("sra_id") for row in rows):
+        tools.append("sra_tools")
+    for name in ("trimming", "alignment", "gene_counts", "peak_calling"):
+        if module_enabled(config, name):
+            tools.append(str(module(config, name).get("tool") or ""))
+    if any(module_enabled(config, name) for name in ("alignment", "mark_duplicates", "bam_filter", "bam_qc")):
+        tools.append("samtools")
+    if module_enabled(config, "coverage"):
+        tools.append("deeptools")
+    if module_enabled(config, "multiqc"):
+        tools.append("multiqc")
+    if module_enabled(config, "salmon_quantification"):
+        tools.append("salmon")
+    if module_enabled(config, "rsem_quantification"):
+        tools.append("rsem")
+    if module_enabled(config, "frip") or module_enabled(config, "tss_enrichment"):
+        tools.append("bedtools")
+    return sorted({name for name in tools if name})
 
 
-def salmon_enabled(config: dict[str, Any]) -> bool:
-    return output_enabled(config, "salmon_gene_quant") or output_enabled(
-        config, "salmon_isoform_quant"
-    )
-
-
-def rsem_enabled(config: dict[str, Any]) -> bool:
-    return output_enabled(config, "rsem_gene_quant") or output_enabled(
-        config, "rsem_isoform_quant"
-    )
-
-
-def transcriptome_bam_needed(config: dict[str, Any]) -> bool:
-    return output_enabled(config, "transcriptome_bam") or salmon_enabled(config) or rsem_enabled(config)
-
-
-def trimming_tool(config: dict[str, Any]) -> str:
-    return str((config.get("trimming") or {}).get("tool") or "fastp")
-
-
-def row_is_paired(row: dict[str, str]) -> bool:
-    return bool(row.get("fastq_2")) or row.get("sra_layout") == "paired"
-
-
-def read_samples(sample_path: Path) -> tuple[list[str], list[dict[str, str]]]:
+def load_samples(config: dict[str, Any]) -> tuple[list[dict[str, str]], list[str]]:
+    project_root = Path(config["_ngsflow"]["project_root"])
+    sample_path = project_path(str(config.get("samples") or ""), project_root)
+    if not sample_path.exists():
+        raise FileNotFoundError(f"Samples file does not exist: {sample_path}")
     with sample_path.open("r", encoding="utf-8", newline="") as handle:
         text = "".join(line for line in handle if not line.lstrip().startswith("#"))
-        reader = csv.DictReader(io.StringIO(text), delimiter="\t")
-        rows = [
-            {key: (value or "").strip() for key, value in row.items()}
-            for row in reader
-            if any((value or "").strip() for value in row.values())
-        ]
-    return reader.fieldnames or [], rows
-
-
-def command_list(args: argparse.Namespace) -> int:
-    data = manifest()
-    assays = data.get("assays", {})
-    if args.kind == "assays":
-        for assay, entry in assays.items():
-            print(f"{assay}\t{entry.get('description', '')}")
-        return 0
-
-    if not args.assay:
-        raise SystemExit("--assay is required when listing presets")
-    entry = assay_entry(args.assay)
-    for preset, preset_data in entry.get("presets", {}).items():
-        print(f"{preset}\t{preset_data.get('description', '')}")
-    return 0
-
-
-def command_init_run(args: argparse.Namespace) -> int:
-    if args.overwrite and args.skip_existing:
-        raise SystemExit("Use either --overwrite or --skip-existing, not both.")
-
-    project_root, config_root, shipped_root = script_paths()
-    preset = preset_entry(args.assay, args.preset)
-    replacements = {
-        "RUN_NAME": args.run_name,
-        "ASSAY": args.assay,
-        "PRESET": args.preset,
-        "GENOME": args.genome,
-    }
-
-    templates_root = shipped_root / "templates"
-    operations: list[tuple[Path, Path, dict[str, str] | None]] = []
-    operations.append(
-        planned_copy(
-            templates_root / preset["run_template"],
-            config_root / "runs" / f"{args.run_name}.yaml",
-            replacements,
-        )
-    )
-    operations.append(
-        planned_copy(
-            templates_root / preset["sample_template"],
-            config_root / "samples" / f"{args.run_name}.tsv",
-            replacements,
-        )
-    )
-
-    profile_groups = preset.get("profiles", {})
-    for group, filenames in profile_groups.items():
-        for filename in filenames:
-            src = templates_root / "profiles" / group / filename
-            dst = config_root / "profiles" / group / filename
-            operations.append(planned_copy(src, dst, replacements))
-
-    missing_sources = [src for src, _, _ in operations if not src.exists()]
-    if missing_sources:
-        raise SystemExit(
-            "Manifest references missing template files:\n  - "
-            + "\n  - ".join(str(path) for path in missing_sources)
-        )
-
-    conflicts = [
-        dst
-        for _, dst, _ in operations
-        if dst.exists() and not args.overwrite and not args.skip_existing
+    reader = csv.DictReader(io.StringIO(text), delimiter="\t")
+    fields = reader.fieldnames or []
+    rows = [
+        {key: (value or "").strip() for key, value in row.items()}
+        for row in reader
+        if any((value or "").strip() for value in row.values())
     ]
-    if conflicts:
-        raise SystemExit(
-            "Refusing to overwrite existing files. Use --overwrite or --skip-existing:\n  - "
-            + "\n  - ".join(display_path(path, project_root) for path in conflicts)
+    return rows, fields
+
+
+def index_is_ready(config: dict[str, Any], aligner: str) -> bool:
+    index_value = str((config.get("reference", {}).get("indexes", {}) or {}).get(aligner) or "").rstrip("/")
+    if not index_value:
+        return False
+    root = Path(config["_ngsflow"]["project_root"])
+    path = project_path(index_value, root)
+    if aligner == "star":
+        return all((path / name).exists() for name in INDEX_FILES[aligner])
+    suffixes = INDEX_FILES[aligner]
+    if aligner == "bowtie2":
+        return all(Path(str(path) + suffix).exists() for suffix in suffixes) or all(
+            Path(str(path) + suffix + "l").exists() for suffix in suffixes
         )
-
-    for src, dst, replacements_for_file in operations:
-        message = write_text_from_template(
-            src,
-            dst,
-            replacements_for_file,
-            overwrite=args.overwrite,
-            skip_existing=args.skip_existing,
-        )
-        print(message.replace(str(project_root) + "\\", "").replace(str(project_root) + "/", ""))
-
-    active_config = write_active_pointer(config_root, args.run_name)
-    print(f"activated {display_path(active_config, project_root)}")
-    print()
-    print("Next steps:")
-    print(f"  1. Edit config/samples/{args.run_name}.tsv")
-    print(f"  2. Edit profiles under config/profiles/ as needed")
-    print("  3. Run: python config/bin/ngsflow.py validate --configfile config/config.yaml")
-    print("  4. Run: snakemake --configfile config/config.yaml --use-conda --cores 16")
-    return 0
+    return all(Path(str(path) + suffix).exists() for suffix in suffixes)
 
 
-def command_activate_run(args: argparse.Namespace) -> int:
-    project_root, config_root, _ = script_paths()
-    run_name = args.run_name.removesuffix(".yaml")
-    run_path = config_root / "runs" / f"{run_name}.yaml"
-    if not run_path.exists():
-        raise SystemExit(f"Run config does not exist: {display_path(run_path, project_root)}")
-    active_config = write_active_pointer(config_root, run_name)
-    print(f"Activated {display_path(run_path, project_root)} via {display_path(active_config, project_root)}")
-    return 0
-
-
-def command_explain(args: argparse.Namespace) -> int:
-    config = resolve_config(args.configfile)
-    project = config.get("project", {})
-    print("SnakeVerse run summary")
-    print(f"  active config: {config['_ngsflow']['configfile']}")
-    print(f"  run config: {config['_ngsflow']['run_config']}")
-    print(f"  project: {project.get('name', '<unset>')}")
-    print(f"  run: {project.get('run_name', '<unset>')}")
-    print(f"  assay: {config.get('assay', '<unset>')}")
-    print(f"  preset: {config.get('preset', '<unset>')}")
-    print(f"  samples: {config.get('samples', '<unset>')}")
-    print(f"  results: {config.get('results_dir', '<unset>')}")
-    print("  loaded profiles:")
-    for profile in config["_ngsflow"]["loaded_profiles"]:
-        print(f"    - {profile}")
-    print("  loaded tool profiles:")
-    for tool in config["_ngsflow"]["loaded_tool_profiles"]:
-        print(f"    - {tool}")
-    print("  enabled outputs:")
-    for name, enabled in (config.get("outputs", {}) or {}).items():
-        print(f"    - {name}: {enabled}")
-    return 0
-
-
-def validation_messages(config: dict[str, Any]) -> tuple[list[str], list[str]]:
-    project_root = Path(config["_ngsflow"]["project_root"])
+def validate_config(config: dict[str, Any]) -> tuple[list[str], list[str]]:
     errors: list[str] = []
     warnings: list[str] = []
-
-    for profile in config["_ngsflow"].get("loaded_profiles", []):
-        if not project_path(profile, project_root).exists():
-            errors.append(f"Missing profile: {profile}")
-
-    samples_value = config.get("samples")
-    if not samples_value:
-        errors.append("Run config is missing samples")
-        return errors, warnings
-
-    sample_path = project_path(samples_value, project_root)
-    if not sample_path.exists():
-        errors.append(f"Samples file does not exist: {samples_value}")
-        return errors, warnings
-
-    fieldnames, rows = read_samples(sample_path)
-    required = required_sample_columns(str(config.get("assay")))
-    missing_columns = [column for column in required if column not in fieldnames]
+    rows, fields = load_samples(config)
+    assay = str(config.get("assay") or "")
+    required_columns = {
+        "generic": ["sample_id", "unit_id", "fastq_1"],
+        "rnaseq": ["sample_id", "unit_id", "fastq_1", "condition", "replicate", "strandedness"],
+        "atacseq": ["sample_id", "unit_id", "fastq_1", "condition", "replicate"],
+    }.get(assay, [])
+    if not required_columns:
+        errors.append(f"Unsupported assay: {assay}")
+    missing_columns = [name for name in required_columns if name not in fields]
     if missing_columns:
         errors.append("Samples file is missing columns: " + ", ".join(missing_columns))
-    for row in rows:
-        row.setdefault("fastq_2", "")
-        row.setdefault("sra_id", "")
-        row.setdefault("sra_layout", "")
-        sample = row.get("sample_id", "<unknown>")
-        for column in required:
-            if column == "fastq_1" and row.get("sra_id"):
-                continue
-            if not row.get(column):
-                errors.append(f"Sample {sample} is missing {column}")
-        if config.get("assay") == "rnaseq" and row.get("strandedness") not in {
-            "unstranded",
-            "forward",
-            "reverse",
-        }:
-            errors.append(
-                f"Sample {sample} has invalid strandedness '{row.get('strandedness')}'"
+    if not rows:
+        errors.append("Samples file contains no sample rows")
+    units = [(row.get("sample_id"), row.get("unit_id")) for row in rows]
+    if len(units) != len(set(units)):
+        errors.append("Samples file contains a duplicate sample_id/unit_id combination")
+
+    active_tools = config.get("tools", {}) or {}
+    missing_tools = [name for name in required_tools(config, rows) if name not in active_tools]
+    if missing_tools:
+        errors.append(
+            "Missing active tool configurations: " + ", ".join(missing_tools)
+            + ". Add each with: python config/bin/ngsflow.py add-tool <tool>"
+        )
+
+    alignment = module(config, "alignment")
+    aligner = str(alignment.get("tool") or "")
+    if not module_enabled(config, "alignment") or aligner not in INDEX_FILES:
+        errors.append("modules.alignment must select star, bowtie2, or bwa_mem2")
+    elif not index_is_ready(config, aligner) and not config.get("reference", {}).get("fasta"):
+        errors.append(f"reference.fasta is required because the {aligner} index must be built")
+
+    trimming = module(config, "trimming")
+    if module_enabled(config, "trimming"):
+        tool = str(trimming.get("tool") or "")
+        adapters = trimming.get("adapters", {}) or {}
+        mode = adapters.get("mode")
+        if tool not in {"fastp", "cutadapt"}:
+            errors.append("modules.trimming.tool must be fastp or cutadapt")
+        if mode not in {"auto", "sequences", "none"}:
+            errors.append("modules.trimming.adapters.mode must be auto, sequences, or none")
+        if mode == "auto" and tool != "fastp":
+            errors.append("Adapter auto-detection is available only with fastp")
+        if mode == "sequences" and not adapters.get("read1"):
+            errors.append("Adapter mode sequences requires modules.trimming.adapters.read1")
+        paired = any(row.get("fastq_2") or row.get("sra_layout") == "paired" for row in rows)
+        if mode == "sequences" and paired and not adapters.get("read2"):
+            errors.append("Paired-end adapter mode sequences requires modules.trimming.adapters.read2")
+        if mode == "none":
+            warnings.append("Trimming is enabled without adapter removal")
+        conflicts = sorted(
+            ADAPTER_TOOL_KEYS.get(tool, set()).intersection(
+                (active_tools.get(tool, {}).get("params", {}) or {}).keys()
             )
-        if row.get("sra_layout") and row.get("sra_layout") not in {"single", "paired"}:
-            errors.append(f"Sample {sample} has invalid sra_layout '{row.get('sra_layout')}'")
-        for column in ("fastq_1", "fastq_2"):
-            value = row.get(column)
+        )
+        if conflicts:
+            errors.append(
+                "Adapter settings belong in modules.trimming.adapters; remove from "
+                f"config/tools/{tool}.yaml: " + ", ".join(conflicts)
+            )
+
+    reference = config.get("reference", {}) or {}
+    if assay == "rnaseq" and module_enabled(config, "gene_counts") and not reference.get("gtf"):
+        errors.append("reference.gtf is required by modules.gene_counts")
+    if assay == "rnaseq" and module_enabled(config, "gene_counts"):
+        modes = module(config, "gene_counts").get("modes", {}) or {}
+        if not any(bool(value) for value in modes.values()):
+            errors.append("modules.gene_counts is enabled but no counting mode is enabled")
+        conflicts = sorted(
+            FEATURECOUNTS_RUN_KEYS.intersection(
+                (active_tools.get("featurecounts", {}).get("params", {}) or {}).keys()
+            )
+        )
+        if conflicts:
+            errors.append(
+                "Counting semantics belong in modules.gene_counts; remove from "
+                "config/tools/featurecounts.yaml: " + ", ".join(conflicts)
+            )
+        layouts = {
+            "paired" if row.get("fastq_2") or row.get("sra_layout") == "paired" else "single"
+            for row in rows
+        }
+        if len(layouts) > 1:
+            errors.append("featureCounts requires one read layout per run; samples mix paired and single")
+        if module(config, "gene_counts").get("strandedness", "sample") == "sample":
+            strand_values = {row.get("strandedness") for row in rows}
+            if len(strand_values) > 1:
+                errors.append("featureCounts requires one strandedness per run; sample values differ")
+    for name in ("salmon_quantification", "rsem_quantification"):
+        settings = module(config, name)
+        if module_enabled(config, name) and not (
+            settings.get("gene_results", True) or settings.get("isoform_results", True)
+        ):
+            errors.append(f"modules.{name} is enabled but requests no result type")
+    if assay == "atacseq" and module_enabled(config, "bam_filter") and not reference.get("blacklist"):
+        warnings.append("ATAC-seq blacklist filtering is recommended; reference.blacklist is blank")
+    if module_enabled(config, "tss_enrichment"):
+        for key in ("tss_bed", "chrom_sizes"):
+            if not reference.get(key):
+                errors.append(f"reference.{key} is required by modules.tss_enrichment")
+
+    project_root = Path(config["_ngsflow"]["project_root"])
+    for key in ("fasta", "gtf", "chrom_sizes", "blacklist", "tss_bed"):
+        value = reference.get(key)
+        if value and not project_path(str(value), project_root).exists():
+            warnings.append(f"Reference path does not exist yet: reference.{key} = {value}")
+    for row in rows:
+        sample = row.get("sample_id") or "<unknown>"
+        if not row.get("fastq_1") and not row.get("sra_id"):
+            errors.append(f"Sample {sample} needs fastq_1 or sra_id")
+        if assay == "rnaseq" and row.get("strandedness") not in {"unstranded", "forward", "reverse"}:
+            errors.append(f"Sample {sample} has invalid strandedness: {row.get('strandedness')}")
+        if row.get("sra_id") and not module_enabled(config, "sra_download"):
+            errors.append(f"Sample {sample} uses sra_id but modules.sra_download is disabled")
+        for key in ("fastq_1", "fastq_2"):
+            value = row.get(key)
             if value and not project_path(value, project_root).exists():
                 warnings.append(f"FASTQ path does not exist yet: {value}")
-    if config.get("assay") == "rnaseq" and featurecounts_enabled(config):
-        layouts = {"paired" if row_is_paired(row) else "single" for row in rows}
-        if len(layouts) > 1:
-            errors.append("featureCounts requires all samples in a run to share PE/SE layout")
-        featurecounts_params = (
-            config.get("tools", {}).get("featurecounts", {}).get("params", {}) or {}
-        )
-        if featurecounts_params.get("paired_end") is True and layouts == {"single"}:
-            errors.append("featureCounts paired_end is true, but the sample sheet is single-end")
-    units_by_sample: dict[str, set[str]] = {}
-    for row in rows:
-        units_by_sample.setdefault(row.get("sample_id", "<unknown>"), set()).add(
-            "paired" if row_is_paired(row) else "single"
-        )
-    for sample, layouts in units_by_sample.items():
-        if len(layouts) > 1:
-            errors.append(f"Sample {sample} mixes paired-end and single-end units")
-
-    aligner = (config.get("alignment") or {}).get("tool")
-    required_tools = ["fastqc", "samtools", "multiqc"]
-    if (config.get("steps") or {}).get("trimming", False):
-        active_trimmer = trimming_tool(config)
-        if active_trimmer not in {"cutadapt", "fastp"}:
-            errors.append(f"Unsupported trimming.tool: {active_trimmer}")
-        required_tools.append(active_trimmer)
-    if any(row.get("sra_id") and not row.get("fastq_1") for row in rows):
-        required_tools.append("sra_tools")
-    if aligner:
-        required_tools.append(aligner)
-    if config.get("assay") == "rnaseq" and featurecounts_enabled(config):
-        required_tools.append("featurecounts")
-    if config.get("assay") == "rnaseq" and salmon_enabled(config):
-        required_tools.append("salmon")
-    if config.get("assay") == "rnaseq" and rsem_enabled(config):
-        required_tools.append("rsem")
-    if config.get("assay") == "atacseq":
-        required_tools.extend(["bedtools", "macs3"])
-    if (config.get("steps") or {}).get("coverage", False):
-        required_tools.append("deeptools")
-    missing_tools = [
-        tool for tool in sorted(set(required_tools)) if tool not in config.get("tools", {})
-    ]
-    if missing_tools:
-        errors.append("Missing active tool profiles: " + ", ".join(missing_tools))
-
-    genome = config.get("genome") or {}
-    if aligner not in INDEX_KEYS:
-        errors.append(f"Unsupported alignment.tool: {aligner}")
-    elif not configured_index_is_ready(genome, aligner, project_root) and not genome.get("fasta"):
-        errors.append(f"Genome profile must define genome.fasta when building a {aligner} index")
-    if config.get("assay") == "rnaseq" and featurecounts_enabled(config) and not genome.get("gtf"):
-        errors.append("Genome profile must define genome.gtf for RNA-seq featureCounts")
-    if config.get("assay") == "rnaseq" and (salmon_enabled(config) or rsem_enabled(config)):
-        if not genome.get("gtf"):
-            errors.append("Genome profile must define genome.gtf for Salmon/RSEM quantification")
-        if not genome.get("fasta"):
-            errors.append("Genome profile must define genome.fasta for Salmon/RSEM reference generation")
-    if config.get("assay") == "atacseq":
-        replicate_values = {row.get("replicate") for row in rows if row.get("replicate")}
-        if len(replicate_values) < 2:
-            warnings.append("ENCODE ATAC-seq standards recommend two or more biological replicates")
-        if not genome.get("blacklist"):
-            warnings.append("ATAC-seq blacklist filtering is recommended; genome.blacklist is blank")
-        if config.get("outputs", {}).get("tss_enrichment", False) and not genome.get("tss_bed"):
-            errors.append("outputs.tss_enrichment requires genome.tss_bed")
-    if transcriptome_bam_needed(config):
-        if aligner != "star":
-            errors.append("STAR transcriptome BAM outputs require alignment.tool: star")
-        star_params = (config.get("tools", {}).get("star", {}).get("params", {}) or {})
-        align_params = star_params.get("align", star_params)
-        quant_mode = str(align_params.get("quantMode", ""))
-        if "TranscriptomeSAM" not in quant_mode:
-            errors.append("STAR transcriptome BAM output requires star.params.align.quantMode to include TranscriptomeSAM")
-
-    for key in ("fasta", "gtf", "chrom_sizes", "blacklist", "tss_bed", "bowtie2_index", "star_index", "bwa_mem2_index"):
-        value = genome.get(key)
-        if value and key == INDEX_KEYS.get(aligner) and not configured_index_is_ready(genome, aligner, project_root):
-            continue
-        if value and not project_path(str(value), project_root).exists():
-            warnings.append(f"Reference path for genome.{key} does not exist yet: {value}")
-
     return errors, warnings
 
 
-def command_validate(args: argparse.Namespace) -> int:
-    try:
-        config = resolve_config(args.configfile)
-        errors, warnings = validation_messages(config)
-    except Exception as exc:
-        print(f"ERROR: {exc}")
-        return 1
+def command_list(args: argparse.Namespace) -> None:
+    if args.kind == "assays":
+        for name, data in catalog_manifest().get("assays", {}).items():
+            print(f"{name}\t{data.get('description', '')}")
+        return
+    if not args.assay:
+        raise ValueError("--assay is required when listing recipes")
+    for name, data in assay_entry(args.assay).get("recipes", {}).items():
+        print(f"{name}\t{data.get('description', '')}")
 
+
+def command_init_run(args: argparse.Namespace) -> None:
+    project_root, config_root, catalog_root = script_paths()
+    recipe = recipe_entry(args.assay, args.recipe)
+    replacements = {
+        "RUN_NAME": args.run_name,
+        "GENOME": args.genome,
+        "ASSAY": args.assay,
+        "RECIPE": args.recipe,
+    }
+    jobs: list[tuple[Path, Path]] = [
+        (catalog_root / recipe["run_template"], config_root / "runs" / f"{args.run_name}.yaml"),
+        (catalog_root / recipe["sample_template"], config_root / "samples" / f"{args.run_name}.tsv"),
+        (catalog_root / "references" / f"{args.genome}.yaml", config_root / "references" / f"{args.genome}.yaml"),
+    ]
+    jobs.extend(
+        (catalog_root / "tools" / f"{tool}.yaml", config_root / "tools" / f"{tool}.yaml")
+        for tool in recipe.get("tools", [])
+    )
+    missing_sources = [source for source, _ in jobs if not source.exists()]
+    if missing_sources:
+        raise FileNotFoundError("Catalog files are missing: " + ", ".join(map(str, missing_sources)))
+    conflicts = [destination for _, destination in jobs if destination.exists()]
+    if conflicts and not (args.overwrite or args.skip_existing):
+        raise FileExistsError(
+            "Initialization would overwrite existing files:\n  "
+            + "\n  ".join(display_path(path, project_root) for path in conflicts)
+            + "\nUse --skip-existing to preserve them or --overwrite to replace them."
+        )
+    for source, destination in jobs:
+        print(materialize(source, destination, replacements, args.overwrite, args.skip_existing))
+    pointer = write_active_pointer(config_root, args.run_name)
+    print(f"activate {display_path(pointer, project_root)}")
+    print("\nEdit these files in order:")
+    print(f"  1. config/samples/{args.run_name}.tsv - replace example samples and FASTQ paths")
+    print(f"  2. config/references/{args.genome}.yaml - set FASTA, annotation, and any ready index")
+    print(f"  3. config/runs/{args.run_name}.yaml - review adapters, modules, and resources")
+    alignment_tool = load_yaml(config_root / "runs" / f"{args.run_name}.yaml").get("modules", {}).get("alignment", {}).get("tool")
+    print(f"  4. config/tools/{alignment_tool}.yaml - review alignment policy")
+    print("  5. Other files in config/tools/ - adjust advanced tool behavior only when needed")
+    print("\nThen run:")
+    print("  python config/bin/ngsflow.py explain")
+    print("  python config/bin/ngsflow.py validate")
+    print("  snakemake --configfile config/config.yaml --use-conda --cores 16")
+
+
+def command_add_tool(args: argparse.Namespace) -> None:
+    project_root, config_root, catalog_root = script_paths()
+    source = catalog_root / "tools" / f"{args.tool}.yaml"
+    if not source.exists():
+        available = ", ".join(path.stem for path in sorted((catalog_root / "tools").glob("*.yaml")))
+        raise ValueError(f"Unknown catalog tool '{args.tool}'. Available: {available}")
+    destination = config_root / "tools" / source.name
+    print(materialize(source, destination, {}, args.overwrite, args.skip_existing))
+    print(f"Review {display_path(destination, project_root)} before running the workflow.")
+
+
+def command_activate_run(args: argparse.Namespace) -> None:
+    project_root, config_root, _ = script_paths()
+    run_path = config_root / "runs" / f"{args.run_name}.yaml"
+    if not run_path.exists():
+        raise FileNotFoundError(f"Run config does not exist: {display_path(run_path, project_root)}")
+    pointer = write_active_pointer(config_root, args.run_name)
+    print(f"Activated {display_path(run_path, project_root)} via {display_path(pointer, project_root)}")
+
+
+def print_default_explanation(config: dict[str, Any]) -> None:
+    meta = config["_ngsflow"]
+    project = config.get("project", {}) or {}
+    print(f"Run: {project.get('run_name', '<unnamed>')} ({config.get('assay', '<unset>')})")
+    recipe = (config.get("created_from") or {}).get("recipe")
+    if recipe:
+        print(f"Created from recipe: {recipe} (provenance only; it does not affect runtime)")
+    print("\nFiles that control this run:")
+    print(f"  run        {meta['run_config']}")
+    print(f"  samples    {config.get('samples')}")
+    print(f"  reference  {meta['reference_file']}")
+    print("\nPipeline:")
+    for name, settings in (config.get("modules") or {}).items():
+        state = "ON " if isinstance(settings, dict) and settings.get("enabled") else "off"
+        tool = f" [{settings.get('tool')}]" if isinstance(settings, dict) and settings.get("tool") else ""
+        print(f"  {state:3} {name}{tool}")
+    print("\nActive tool files:")
+    for name, path in meta.get("tool_files", {}).items():
+        print(f"  {name:18} {path}")
+    trimming = module(config, "trimming")
+    alignment = module(config, "alignment")
+    print("\nReview first:")
+    print(f"  adapters   mode={(trimming.get('adapters') or {}).get('mode', '<unset>')} (run file)")
+    print(f"  alignment  {alignment.get('tool', '<unset>')} (run file + matching tool file)")
+    print("  reference  required fields depend on the enabled modules")
+    print("\nMore detail: ngsflow.py explain trimming | alignment | reference | tool <name>")
+
+
+def command_explain(args: argparse.Namespace) -> None:
+    config = resolve_config(args.configfile)
+    topic = args.topic or []
+    if not topic:
+        print_default_explanation(config)
+        return
+    if topic[0] == "trimming":
+        settings = module(config, "trimming")
+        print("Trimming is configured in the run file under modules.trimming.")
+        print(f"  enabled: {settings.get('enabled', False)}")
+        print(f"  tool: {settings.get('tool', '<unset>')}")
+        print(f"  adapters: {settings.get('adapters', {})}")
+        print("Use mode auto with fastp, sequences for explicit adapters, or none for quality-only trimming.")
+    elif topic[0] == "alignment":
+        settings = module(config, "alignment")
+        tool = str(settings.get("tool") or "")
+        print("The run file selects the aligner; its active tool file controls advanced CLI behavior.")
+        print(f"  selection: {settings}")
+        print(f"  tool file: {config['_ngsflow'].get('tool_files', {}).get(tool, '<missing>')}")
+        print(f"  index: {(config.get('reference', {}).get('indexes', {}) or {}).get(tool) or '<build from FASTA>'}")
+    elif topic[0] == "reference":
+        print(f"Reference file: {config['_ngsflow']['reference_file']}")
+        print("Blank optional fields are valid; requirements are derived from enabled modules.")
+        for key, value in config.get("reference", {}).items():
+            print(f"  {key}: {value if value not in (None, '') else '<blank>'}")
+    elif topic[0] == "tool" and len(topic) == 2:
+        name = topic[1]
+        if name not in config.get("tools", {}):
+            raise ValueError(f"Tool '{name}' is not active. Add it with: ngsflow.py add-tool {name}")
+        print(f"Tool file: {config['_ngsflow']['tool_files'][name]}")
+        print(yaml.safe_dump(config["tools"][name], sort_keys=False).rstrip())
+    else:
+        raise ValueError("Explain topics: trimming, alignment, reference, or tool <name>")
+
+
+def command_validate(args: argparse.Namespace) -> None:
+    config = resolve_config(args.configfile)
+    errors, warnings = validate_config(config)
     for warning in warnings:
         print(f"WARNING: {warning}")
     if errors:
         for error in errors:
-            print(f"ERROR: {error}")
-        return 1
-
+            print(f"ERROR: {error}", file=sys.stderr)
+        raise SystemExit(1)
+    print(f"Valid SnakeVerse configuration: {config['_ngsflow']['run_config']}")
     if warnings:
-        print("Validation passed with warnings.")
-    else:
-        print("Validation passed.")
-    return 0
+        print(f"Validation passed with {len(warnings)} warning(s).")
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        prog="ngsflow.py",
-        description="Local helper for materializing and validating SnakeVerse configs.",
-    )
+    parser = argparse.ArgumentParser(description="Materialize and inspect SnakeVerse configuration.")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    list_parser = subparsers.add_parser("list", help="List available shipped templates.")
-    list_parser.add_argument("kind", choices=["assays", "presets"])
-    list_parser.add_argument("--assay", help="Assay name when listing presets.")
+    list_parser = subparsers.add_parser("list", help="List catalog assays or recipes.")
+    list_parser.add_argument("kind", choices=["assays", "recipes"])
+    list_parser.add_argument("--assay", help="Assay name when listing recipes.")
     list_parser.set_defaults(func=command_list)
 
-    init_parser = subparsers.add_parser("init-run", help="Initialize an active run config.")
+    init_parser = subparsers.add_parser("init-run", help="Create one complete editable run.")
     init_parser.add_argument("--assay", required=True)
-    init_parser.add_argument("--preset", required=True)
+    init_parser.add_argument("--recipe", required=True)
     init_parser.add_argument("--genome", required=True)
     init_parser.add_argument("--run-name", required=True)
-    init_parser.add_argument("--overwrite", action="store_true")
-    init_parser.add_argument("--skip-existing", action="store_true")
+    init_mode = init_parser.add_mutually_exclusive_group()
+    init_mode.add_argument("--overwrite", action="store_true")
+    init_mode.add_argument("--skip-existing", action="store_true")
     init_parser.set_defaults(func=command_init_run)
 
-    activate_parser = subparsers.add_parser("activate-run", help="Switch config/config.yaml to an existing run.")
+    tool_parser = subparsers.add_parser("add-tool", help="Copy one advanced tool config from the catalog.")
+    tool_parser.add_argument("tool")
+    tool_mode = tool_parser.add_mutually_exclusive_group()
+    tool_mode.add_argument("--overwrite", action="store_true")
+    tool_mode.add_argument("--skip-existing", action="store_true")
+    tool_parser.set_defaults(func=command_add_tool)
+
+    activate_parser = subparsers.add_parser("activate-run", help="Point config/config.yaml at a run.")
     activate_parser.add_argument("run_name")
     activate_parser.set_defaults(func=command_activate_run)
 
-    explain_parser = subparsers.add_parser("explain", help="Explain the active resolved config.")
+    explain_parser = subparsers.add_parser("explain", help="Explain the active run or one topic.")
+    explain_parser.add_argument("topic", nargs="*")
     explain_parser.add_argument("--configfile", default="config/config.yaml")
     explain_parser.set_defaults(func=command_explain)
 
-    validate_parser = subparsers.add_parser("validate", help="Run basic active config checks.")
+    validate_parser = subparsers.add_parser("validate", help="Validate the active run.")
     validate_parser.add_argument("--configfile", default="config/config.yaml")
     validate_parser.set_defaults(func=command_validate)
-
     return parser
 
 
-def main(argv: list[str] | None = None) -> int:
+def main() -> None:
     parser = build_parser()
-    args = parser.parse_args(argv)
-    return args.func(args)
+    args = parser.parse_args()
+    try:
+        args.func(args)
+    except (FileNotFoundError, FileExistsError, ValueError) as exc:
+        parser.error(str(exc))
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()

@@ -1,0 +1,23 @@
+# Editable STAR profile.
+tool: star
+version: "2.7.11b"
+
+params:
+  index:
+    # REVIEW when read lengths differ substantially from 100 bp.
+    sjdbOverhang: 99
+  align:
+    # REVIEW multimapping, mismatch, and end-alignment policy for the assay.
+    readFilesCommand: zcat
+    outSAMtype: "BAM SortedByCoordinate"
+    outFilterMultimapNmax: 20
+    outFilterMismatchNoverReadLmax: 0.04
+    alignSJoverhangMin: 8
+    alignSJDBoverhangMin: 1
+    alignEndsType: EndToEnd
+    outSAMattributes: "NH HI AS NM MD"
+    # TranscriptomeSAM is honored only when the run requests a transcriptome BAM.
+    quantMode: "GeneCounts TranscriptomeSAM"
+
+# Appended verbatim to the STAR command.
+extra: ""

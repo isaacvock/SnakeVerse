@@ -1,0 +1,6 @@
+tool: featurecounts
+version: "subread"
+
+params: {}
+
+extra: ""

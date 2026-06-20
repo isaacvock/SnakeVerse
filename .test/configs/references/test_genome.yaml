@@ -1,0 +1,14 @@
+reference:
+  name: chr21_test
+  fasta: .test/data/genome/genome.fasta
+  gtf: .test/data/annotation/genome.gtf
+  chrom_sizes: .test/data/genome/genome.chrom.sizes
+  blacklist: .test/data/annotation/blacklist.bed
+  tss_bed: .test/data/annotation/tss.bed
+  indexes:
+    bowtie2:
+    # Exercise creation at a configured-but-not-yet-existing index directory.
+    star: .test/results/rnaseq/reference/star/configured_index
+    bwa_mem2:
+  effective_genome_size: 46709983
+  macs3_genome_size: 46709983

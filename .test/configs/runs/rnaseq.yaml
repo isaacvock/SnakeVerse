@@ -1,37 +1,53 @@
-project:
-  name: snakeverse_ci
-  run_name: rnaseq
-
+schema_version: 2
+created_from: {recipe: star_featurecounts, version: 1}
+project: {name: snakeverse_ci, run_name: rnaseq}
 assay: rnaseq
-preset: star_featurecounts
-
 samples: .test/configs/samples/rnaseq.tsv
-
-profile_stack:
-  - .test/configs/profiles/assays/rnaseq.yaml
-  - .test/configs/profiles/protocols/rnaseq_star_featurecounts.yaml
-  - .test/configs/profiles/genomes/test_genome.yaml
-
+reference: .test/configs/references/test_genome.yaml
 results_dir: .test/results/rnaseq
 
-# Exercise configured-index destination semantics: this directory is absent on
-# a clean checkout and should be populated by the STAR index-building rule.
-genome:
-  star_index: .test/results/rnaseq/reference/star/configured_index
+modules:
+  sra_download: {enabled: false}
+  fastq_qc: {enabled: true}
+  trimming:
+    enabled: true
+    tool: fastp
+    adapters: {mode: auto, read1: null, read2: null}
+  alignment: {enabled: true, tool: star, transcriptome_bam: true}
+  mark_duplicates: {enabled: false}
+  bam_filter:
+    enabled: true
+    min_mapq: 10
+    required_flags: null
+    excluded_flags: 1804
+    keep_duplicates: true
+    exclude_contigs: []
+  bam_qc: {enabled: true}
+  gene_counts:
+    enabled: true
+    tool: featurecounts
+    modes: {standard: true, exon_strict: true, full_gene: true}
+    feature_type: exon
+    attribute_type: gene_id
+    strandedness: sample
+    paired_end: auto
+    count_read_pairs: auto
+    require_both_ends_mapped: false
+    count_multimapping_reads: false
+    count_overlapping_features: false
+  salmon_quantification: {enabled: true, gene_results: true, isoform_results: true}
+  rsem_quantification: {enabled: false, gene_results: true, isoform_results: true}
+  coverage: {enabled: true, strand_mode: sample}
+  multiqc: {enabled: true}
 
-outputs:
-  fastq_qc: true
-  trimmed_fastq: true
-  raw_bam: true
-  filtered_bam: true
-  bam_qc: true
-  gene_counts: true
-  exon_strict_counts: true
-  full_gene_counts: true
-  transcriptome_bam: true
-  salmon_gene_quant: true
-  salmon_isoform_quant: true
-  rsem_gene_quant: false
-  rsem_isoform_quant: false
-  bigwig: true
-  multiqc: true
+resources:
+  fastqc: {threads: 1, mem_mb: 512, runtime_min: 15}
+  fastp: {threads: 2, mem_mb: 1024, runtime_min: 30}
+  star: {threads: 2, mem_mb: 4096, runtime_min: 90}
+  star_index: {threads: 2, mem_mb: 4096, runtime_min: 90}
+  samtools_filter: {threads: 2, mem_mb: 1024, runtime_min: 30}
+  samtools_qc: {threads: 1, mem_mb: 512, runtime_min: 15}
+  featurecounts: {threads: 2, mem_mb: 1024, runtime_min: 30}
+  salmon: {threads: 2, mem_mb: 1024, runtime_min: 30}
+  deeptools: {threads: 2, mem_mb: 1024, runtime_min: 30}
+  multiqc: {threads: 1, mem_mb: 512, runtime_min: 15}

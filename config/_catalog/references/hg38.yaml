@@ -1,0 +1,29 @@
+# Shared hg38 reference configuration.
+# Required paths intentionally start blank: set only the files available locally.
+reference:
+  name: hg38
+
+  # REQUIRED for index construction and alignment when no ready index is supplied.
+  fasta:
+
+  # REQUIRED for RNA-seq counting and transcript quantification.
+  gtf:
+
+  # Required only by modules such as ATAC-seq TSS enrichment.
+  chrom_sizes:
+
+  # Optional. Used only by BAM filtering when provided; recommended for ATAC-seq.
+  blacklist:
+
+  # Optional. Required only when the ATAC-seq tss_enrichment module is enabled.
+  tss_bed:
+
+  # Leave an index blank to let SnakeVerse build it from the FASTA (and GTF for STAR).
+  indexes:
+    bowtie2:
+    star:
+    bwa_mem2:
+
+  # hg38-specific values used by deepTools and MACS3. Change for another assembly.
+  effective_genome_size: 2913022398
+  macs3_genome_size: hs

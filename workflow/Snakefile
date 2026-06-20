@@ -63,6 +63,7 @@ from samples import (
     fastqc_targets,
     has_sra_samples,
     load_samples,
+    markdup_bam_targets,
     raw_bam_targets,
     sample_ids,
     transcriptome_bam_targets,
@@ -91,13 +92,25 @@ for warning in VALIDATION_WARNINGS:
     print(f"SnakeVerse warning: {warning}")
 
 
-output_enabled = lambda name: bool(config.get("outputs", {}).get(name, False))
-step_enabled = lambda name, default=True: bool(config.get("steps", {}).get(name, default))
-trimming_for_alignment = lambda: step_enabled("trimming", False)
-TRIMMING_TOOL = config.get("trimming", {}).get("tool") or "fastp"
-salmon_quant_enabled = lambda: output_enabled("salmon_gene_quant") or output_enabled("salmon_isoform_quant")
-rsem_quant_enabled = lambda: output_enabled("rsem_gene_quant") or output_enabled("rsem_isoform_quant")
-needs_transcriptome_bam = lambda: output_enabled("transcriptome_bam") or salmon_quant_enabled() or rsem_quant_enabled()
+module_settings = lambda name: snakeverse_config.module_config(config, name)
+module_enabled = lambda name: snakeverse_config.module_enabled(config, name)
+module_tool = lambda name, default="": snakeverse_config.module_tool(config, name, default)
+gene_count_mode_enabled = lambda name: module_enabled("gene_counts") and bool(
+    module_settings("gene_counts").get("modes", {}).get(name, False)
+)
+trimming_for_alignment = lambda: module_enabled("trimming")
+TRIMMING_TOOL = module_tool("trimming", "fastp")
+salmon_quant_enabled = lambda: module_enabled("salmon_quantification")
+rsem_quant_enabled = lambda: module_enabled("rsem_quantification")
+salmon_result_enabled = lambda name: salmon_quant_enabled() and bool(
+    module_settings("salmon_quantification").get(name, True)
+)
+rsem_result_enabled = lambda name: rsem_quant_enabled() and bool(
+    module_settings("rsem_quantification").get(name, True)
+)
+needs_transcriptome_bam = lambda: bool(
+    module_settings("alignment").get("transcriptome_bam", False)
+) or salmon_quant_enabled() or rsem_quant_enabled()
 
 raw_bam_path = lambda sample: f"{RESULTS_DIR}/bam/raw/{sample}.bam"
 raw_bai_path = lambda sample: f"{RESULTS_DIR}/bam/raw/{sample}.bam.bai"
@@ -106,16 +119,16 @@ markdup_bai_path = lambda sample: f"{RESULTS_DIR}/bam/markdup/{sample}.bam.bai"
 filtered_bam_path = lambda sample: f"{RESULTS_DIR}/bam/filtered/{sample}.bam"
 filtered_bai_path = lambda sample: f"{RESULTS_DIR}/bam/filtered/{sample}.bam.bai"
 pre_filter_bam_path = lambda sample: (
-    markdup_bam_path(sample) if step_enabled("mark_duplicates", False) else raw_bam_path(sample)
+    markdup_bam_path(sample) if module_enabled("mark_duplicates") else raw_bam_path(sample)
 )
 pre_filter_bai_path = lambda sample: (
-    markdup_bai_path(sample) if step_enabled("mark_duplicates", False) else raw_bai_path(sample)
+    markdup_bai_path(sample) if module_enabled("mark_duplicates") else raw_bai_path(sample)
 )
 final_bam_path = lambda sample: (
-    filtered_bam_path(sample) if step_enabled("bam_filter", True) else raw_bam_path(sample)
+    filtered_bam_path(sample) if module_enabled("bam_filter") else pre_filter_bam_path(sample)
 )
 final_bai_path = lambda sample: (
-    filtered_bai_path(sample) if step_enabled("bam_filter", True) else raw_bai_path(sample)
+    filtered_bai_path(sample) if module_enabled("bam_filter") else pre_filter_bai_path(sample)
 )
 
 alignment_r1 = lambda wildcards: alignment_fastq_1(
@@ -135,15 +148,15 @@ rule all:
         lambda wildcards: ASSAY_TARGETS
 
 
-if has_sra_samples(SAMPLES):
+if module_enabled("sra_download") and has_sra_samples(SAMPLES):
     include: workflow_file("rules/common/sra_download.smk")
 
 include: workflow_file("rules/common/fastq_qc.smk")
 
-if step_enabled("trimming", False):
+if module_enabled("trimming"):
     include: workflow_file("rules/common/trimming.smk")
 
-ALIGNER = config.get("alignment", {}).get("tool")
+ALIGNER = module_tool("alignment")
 if ALIGNER == "bowtie2":
     include: workflow_file("rules/common/index_bowtie2.smk")
     include: workflow_file("rules/common/align_bowtie2.smk")

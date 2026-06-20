@@ -1,0 +1,33 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+title: "SnakeVerse run config v2"
+type: object
+required:
+  - schema_version
+  - project
+  - assay
+  - samples
+  - reference
+  - results_dir
+  - modules
+properties:
+  schema_version:
+    const: 2
+  created_from:
+    type: object
+    required: [recipe, version]
+  project:
+    type: object
+    required: [name, run_name]
+  assay:
+    enum: [generic, rnaseq, atacseq]
+  samples:
+    type: string
+  reference:
+    type: string
+  results_dir:
+    type: string
+  modules:
+    type: object
+  resources:
+    type: object
+additionalProperties: true

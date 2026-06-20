@@ -1,0 +1,10 @@
+# Editable featureCounts profile.
+tool: featurecounts
+version: "subread"
+
+# Advanced featureCounts-only options may be added here. Counting semantics
+# are owned by modules.gene_counts in the run config.
+params: {}
+
+# Appended verbatim to the featureCounts command.
+extra: ""
