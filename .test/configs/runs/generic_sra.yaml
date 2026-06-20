@@ -1,10 +1,10 @@
 schema_version: 2
 created_from: {recipe: fastq_to_bam, version: 1}
-project: {name: snakeverse_ci, run_name: generic}
+project: {name: snakeverse_ci, run_name: generic_sra}
 assay: generic
-samples: .test/configs/samples/generic.tsv
+samples: .test/configs/samples/generic_sra.tsv
 reference: .test/configs/references/test_genome.yaml
-results_dir: .test/results/generic
+results_dir: .test/results/generic_sra
 
 modules:
   fastq_qc: {enabled: true}
@@ -22,15 +22,14 @@ modules:
     keep_duplicates: true
     exclude_contigs: []
   bam_qc: {enabled: true}
-  coverage: {enabled: true, strand_mode: none}
-  multiqc: {enabled: true}
+  coverage: {enabled: false, strand_mode: none}
+  multiqc: {enabled: false}
 
 resources:
+  sra_tools: {threads: 2, mem_mb: 1024, runtime_min: 60}
   fastqc: {threads: 1, mem_mb: 512, runtime_min: 15}
   fastp: {threads: 2, mem_mb: 1024, runtime_min: 30}
   bowtie2: {threads: 2, mem_mb: 2048, runtime_min: 60}
   bowtie2_index: {threads: 2, mem_mb: 2048, runtime_min: 60}
   samtools_filter: {threads: 2, mem_mb: 1024, runtime_min: 30}
   samtools_qc: {threads: 1, mem_mb: 512, runtime_min: 15}
-  deeptools: {threads: 2, mem_mb: 1024, runtime_min: 30}
-  multiqc: {threads: 1, mem_mb: 512, runtime_min: 15}

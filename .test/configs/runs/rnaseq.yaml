@@ -7,7 +7,6 @@ reference: .test/configs/references/test_genome.yaml
 results_dir: .test/results/rnaseq
 
 modules:
-  sra_download: {enabled: false}
   fastq_qc: {enabled: true}
   trimming:
     enabled: true

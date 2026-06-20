@@ -18,9 +18,6 @@ results_dir: results/{{RUN_NAME}}
 # Each module has one switch. Enabled modules produce their canonical outputs;
 # required upstream work is inferred by Snakemake.
 modules:
-  sra_download:
-    enabled: false
-
   fastq_qc:
     enabled: true
 

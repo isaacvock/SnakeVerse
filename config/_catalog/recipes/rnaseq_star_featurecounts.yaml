@@ -15,9 +15,6 @@ reference: config/references/{{GENOME}}.yaml
 results_dir: results/{{RUN_NAME}}
 
 modules:
-  sra_download:
-    enabled: false
-
   fastq_qc:
     enabled: true
 

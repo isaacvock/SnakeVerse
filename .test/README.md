@@ -23,6 +23,7 @@ CI validates configs, lints the Snakefile, performs dry-runs, and executes:
   transcriptome BAMs, featureCounts standard/strict/full-gene counts, and Salmon
   gene/isoform quantification
 - a BWA-MEM2 FASTQ-to-BAM dry-run to exercise the third aligner path
+- an SRA-backed generic dry-run proving downloads are inferred from sample rows
 - a full paired-end ATAC-seq run on the K562 ENCODE chr21 fixture with Bowtie2,
   duplicate marking, blacklist/TSS reference fields, MACS3 peaks, and ATAC QC
   target assertions

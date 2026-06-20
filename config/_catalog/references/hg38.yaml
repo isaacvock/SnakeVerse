@@ -18,7 +18,9 @@ reference:
   # Optional. Required only when the ATAC-seq tss_enrichment module is enabled.
   tss_bed:
 
-  # Leave an index blank to let SnakeVerse build it from the FASTA (and GTF for STAR).
+  # Leave an index blank to build it under the run's results directory, or
+  # provide a destination where SnakeVerse should reuse or create the index.
+  # Index construction uses the FASTA and, for STAR, the GTF when available.
   indexes:
     bowtie2:
     star:

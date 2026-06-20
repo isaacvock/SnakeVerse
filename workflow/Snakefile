@@ -148,7 +148,7 @@ rule all:
         lambda wildcards: ASSAY_TARGETS
 
 
-if module_enabled("sra_download") and has_sra_samples(SAMPLES):
+if has_sra_samples(SAMPLES):
     include: workflow_file("rules/common/sra_download.smk")
 
 include: workflow_file("rules/common/fastq_qc.smk")

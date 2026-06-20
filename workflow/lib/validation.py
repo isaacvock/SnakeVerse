@@ -52,7 +52,7 @@ def _required_tools(config: dict[str, Any], samples: list[dict[str, str]]) -> li
     tools: list[str] = []
     if _enabled(config, "fastq_qc"):
         tools.append("fastqc")
-    if _enabled(config, "sra_download") and has_sra_samples(samples):
+    if has_sra_samples(samples):
         tools.append("sra_tools")
     if _enabled(config, "trimming"):
         tools.append(str(_module(config, "trimming").get("tool") or ""))
@@ -241,8 +241,6 @@ def validate_resolved_config(
             )
         if row.get("sra_layout") and row.get("sra_layout") not in {"single", "paired"}:
             errors.append(f"Sample {sample} has invalid sra_layout '{row.get('sra_layout')}'")
-        if row.get("sra_id") and not _enabled(config, "sra_download"):
-            errors.append(f"Sample {sample} uses sra_id but modules.sra_download is disabled")
         for fastq_col in ("fastq_1", "fastq_2"):
             fastq = row.get(fastq_col)
             if fastq and not _project_path(config, fastq).exists():

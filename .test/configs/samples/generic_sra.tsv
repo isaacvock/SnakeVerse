@@ -1,0 +1,2 @@
+sample_id	unit_id	fastq_1	fastq_2	sra_id	sra_layout
+SRA_sample	unit1			SRR000001	single

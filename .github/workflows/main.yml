@@ -78,6 +78,7 @@ jobs:
           python config/bin/ngsflow.py validate --configfile .test/configs/atacseq.yaml
           python config/bin/ngsflow.py explain --configfile .test/configs/generic_bwa_mem2.yaml
           python config/bin/ngsflow.py validate --configfile .test/configs/generic_bwa_mem2.yaml
+          python config/bin/ngsflow.py validate --configfile .test/configs/generic_sra.yaml
 
       - name: Recipe initialization smoke test
         run: |
@@ -111,6 +112,7 @@ jobs:
           snakemake --snakefile workflow/Snakefile --configfile .test/configs/rnaseq.yaml --dry-run --cores 2 --printshellcmds
           snakemake --snakefile workflow/Snakefile --configfile .test/configs/atacseq.yaml --dry-run --cores 2 --printshellcmds
           snakemake --snakefile workflow/Snakefile --configfile .test/configs/generic_bwa_mem2.yaml --dry-run --cores 2 --printshellcmds
+          snakemake --snakefile workflow/Snakefile --configfile .test/configs/generic_sra.yaml --dry-run --cores 2 --printshellcmds
 
       - name: Full generic FASTQ-to-BAM run
         run: |

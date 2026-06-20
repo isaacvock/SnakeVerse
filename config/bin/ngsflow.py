@@ -211,7 +211,7 @@ def required_tools(config: dict[str, Any], rows: list[dict[str, str]]) -> list[s
     tools: list[str] = []
     if module_enabled(config, "fastq_qc"):
         tools.append("fastqc")
-    if module_enabled(config, "sra_download") and any(row.get("sra_id") for row in rows):
+    if any(row.get("sra_id") and not row.get("fastq_1") for row in rows):
         tools.append("sra_tools")
     for name in ("trimming", "alignment", "gene_counts", "peak_calling"):
         if module_enabled(config, name):
@@ -380,8 +380,6 @@ def validate_config(config: dict[str, Any]) -> tuple[list[str], list[str]]:
             errors.append(f"Sample {sample} needs fastq_1 or sra_id")
         if assay == "rnaseq" and row.get("strandedness") not in {"unstranded", "forward", "reverse"}:
             errors.append(f"Sample {sample} has invalid strandedness: {row.get('strandedness')}")
-        if row.get("sra_id") and not module_enabled(config, "sra_download"):
-            errors.append(f"Sample {sample} uses sra_id but modules.sra_download is disabled")
         for key in ("fastq_1", "fastq_2"):
             value = row.get(key)
             if value and not project_path(value, project_root).exists():

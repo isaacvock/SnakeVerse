@@ -270,14 +270,16 @@ values are `unstranded`, `forward`, and `reverse`. With
 featureCounts `-s` value. Because featureCounts creates one matrix per run, all
 samples in that run must share a layout and strandedness.
 
-SRA accessions are opt-in. Add `sra_tools`, enable `modules.sra_download`, set
-`sra_id`, leave FASTQ paths blank, and set `sra_layout` to `single` or `paired`:
+SRA accessions are detected per sample row. Set `sra_id`, leave the FASTQ paths
+blank, set `sra_layout` to `single` or `paired`, and add the SRA tool config:
 
 ```bash
 python config/bin/ngsflow.py add-tool sra_tools
 ```
 
-Downloads use fasterq-dump plus parallel pigz compression.
+Rows with local FASTQ paths continue to use those files, so local and SRA-backed
+samples can coexist in one run. Downloads use fasterq-dump plus parallel pigz
+compression.
 
 ## References and Indexes
 
