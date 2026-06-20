@@ -1,15 +1,27 @@
-# Editable Bowtie2 profile.
+# Bowtie2 index and alignment policy. SnakeVerse supplies the index/FASTA,
+# reads, paired/single layout, threads, output stream, and samtools sorting.
+# Docs: https://bowtie-bio.sourceforge.net/bowtie2/manual.shtml
 tool: bowtie2
 version: "2.5"
 
 params:
-  index: {}
+  index:
+    # Force the larger .bt2l index format. Usually unnecessary for human-sized
+    # references; false omits --large-index.
+    large_index: false
   align:
-    # REVIEW alignment sensitivity and paired-end insert-size expectations.
+    # Bowtie2 preset emitted verbatim. Other valid presets include --sensitive
+    # and --very-sensitive-local.
     sensitivity: "--very-sensitive"
+    # Maximum valid paired-end fragment length (-X); ignored for single-end data.
     max_insert_size: 1000
+    # When true, suppress unpaired alignments for paired-end reads.
     no_mixed: false
+    # When true, suppress discordant paired-end alignments.
     no_discordant: false
 
-# Appended verbatim to the Bowtie2 command.
-extra: ""
+# Command-specific escape hatches. Each value is appended verbatim only to the
+# named command, preventing an index option from leaking into alignment.
+extra:
+  index: ""
+  align: ""

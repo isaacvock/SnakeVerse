@@ -1,12 +1,21 @@
-# Editable Salmon profile.
+# Salmon alignment-based quantification settings. SnakeVerse supplies the
+# transcriptome-aligned BAM, transcript FASTA, output directory, gene map when
+# needed, and threads. Quantification output selection belongs in the run file.
+# Docs: https://salmon.readthedocs.io/en/latest/salmon.html
 tool: salmon
 version: "1"
 
 params:
+  # A asks Salmon to infer library orientation. Replace with an explicit Salmon
+  # library type only when you know the protocol and want strict validation.
   library_type: A
+  # Model sequence-specific bias.
   seq_bias: true
+  # Model fragment-level GC bias.
   gc_bias: true
+  # Optional uncertainty estimates; blank/0 omits the corresponding option.
+  num_bootstraps:
+  num_gibbs_samples:
 
-# Appended verbatim to the salmon quant command.
+# Appended verbatim to salmon quant.
 extra: ""
-

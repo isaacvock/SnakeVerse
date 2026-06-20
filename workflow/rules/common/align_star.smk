@@ -27,7 +27,7 @@ if needs_transcriptome_bam():
             reads=lambda wildcards, input: star_reads_arg(input.r1, input.r2),
             prefix=lambda wildcards: f"{RESULTS_DIR}/star/{wildcards.sample}/",
             star_args=lambda wildcards: render_star_alignment(config, True),
-            extra=lambda wildcards: tool_extra(config, "star")
+            extra=lambda wildcards: tool_extra(config, "star", section="align")
         shell:
             """
             set -euo pipefail
@@ -64,7 +64,7 @@ else:
             reads=lambda wildcards, input: star_reads_arg(input.r1, input.r2),
             prefix=lambda wildcards: f"{RESULTS_DIR}/star/{wildcards.sample}/",
             star_args=lambda wildcards: render_star_alignment(config, False),
-            extra=lambda wildcards: tool_extra(config, "star")
+            extra=lambda wildcards: tool_extra(config, "star", section="align")
         shell:
             """
             set -euo pipefail

@@ -1,14 +1,24 @@
-# Editable cutadapt profile.
+# Cutadapt trimming and filtering options. Adapter sequences belong in the run
+# file under modules.trimming.adapters. SnakeVerse supplies I/O, paired/single
+# layout, and --cores. Null/false/blank values are omitted.
+# Docs: https://cutadapt.readthedocs.io/en/stable/reference.html
 tool: cutadapt
 version: "4"
 
 params:
+  # Trim low-quality 5' and 3' ends using these Phred thresholds.
   quality_cutoff: "20,20"
+  # Discard reads shorter than this after trimming.
   minimum_length: 20
+  # Maximum adapter-match error rate.
   error_rate: 0.1
+  # Maximum adapter-removal rounds per read; 1 is Cutadapt's normal behavior.
+  times: 1
+  # Set for two-color chemistry only; it is not a general quality cutoff.
+  nextseq_trim:
 
 # Adapter policy and sequences are owned by modules.trimming.adapters in the
 # run config so they cannot silently conflict with this file.
 
-# Appended verbatim to the cutadapt command.
+# Appended verbatim for uncommon Cutadapt options.
 extra: ""

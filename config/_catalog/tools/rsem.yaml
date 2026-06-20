@@ -1,11 +1,34 @@
-# Editable RSEM profile.
+# RSEM reference-preparation and alignment-based quantification settings.
+# SnakeVerse supplies FASTA/GTF/reference prefixes, STAR transcriptome BAMs,
+# output prefixes, threads, paired/single layout, and strandedness. In
+# particular, do not repeat --paired-end or --strandedness here.
+#
+# Under each command, YAML keys become long options: estimate_rspd: true emits
+# --estimate-rspd; false/null/blank values are omitted; scalar values emit an
+# option plus its value. Use extra only when an option cannot be represented
+# cleanly this way.
+# Docs: https://github.com/deweylab/RSEM
 tool: rsem
 version: "1"
 
 params:
-  prepare_reference: {}
-  quant: {}
+  prepare_reference:
+    # Suppress routine RSEM messages. Errors are still captured in the rule log.
+    quiet: false
+  quant:
+    # Estimate the read start position distribution instead of using RSEM's
+    # default model. Usually unnecessary for standard bulk RNA-seq.
+    estimate_rspd: false
+    # Calculate posterior credibility intervals; substantially increases work.
+    calc_ci: false
+    # Reproducibility seed for stochastic calculations. Blank uses RSEM's default.
+    seed:
+    # Skip RSEM's optional posterior BAM outputs. SnakeVerse does not target
+    # those BAMs, so enable this if disk usage matters.
+    no_bam_output: false
 
-# Appended verbatim to RSEM commands.
-extra: ""
-
+# Verbatim options are isolated by command so they cannot leak between the two
+# different RSEM CLIs.
+extra:
+  prepare_reference: ""
+  quant: ""

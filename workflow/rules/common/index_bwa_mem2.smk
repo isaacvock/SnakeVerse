@@ -19,7 +19,7 @@ rule bwa_mem2_index:
     params:
         prefix=lambda wildcards: aligner_index_prefix(config, RESULTS_DIR, "bwa_mem2"),
         rendered=lambda wildcards: render_tool_params(config, "bwa_mem2", section="index"),
-        extra=lambda wildcards: tool_extra(config, "bwa_mem2")
+        extra=lambda wildcards: tool_extra(config, "bwa_mem2", section="index")
     shell:
         """
         mkdir -p $(dirname {params.prefix}) $(dirname {log})

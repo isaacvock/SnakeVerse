@@ -1,5 +1,5 @@
 from params import render_featurecounts_for_config, render_tool_params, resource_value, tool_extra
-from samples import sample_layout
+from samples import rsem_strandedness_arg, sample_layout
 
 
 RNASEQ_TARGETS = []
@@ -267,7 +267,7 @@ if rsem_quant_enabled():
         params:
             prefix=lambda wildcards: f"{RESULTS_DIR}/reference/rsem/{GENOME_SLUG}/{GENOME_SLUG}",
             rendered=lambda wildcards: render_tool_params(config, "rsem", section="prepare_reference"),
-            extra=lambda wildcards: tool_extra(config, "rsem")
+            extra=lambda wildcards: tool_extra(config, "rsem", section="prepare_reference")
         shell:
             """
             mkdir -p $(dirname {params.prefix}) $(dirname {log})
@@ -296,12 +296,13 @@ if rsem_quant_enabled():
                 reference_prefix=lambda wildcards: f"{RESULTS_DIR}/reference/rsem/{GENOME_SLUG}/{GENOME_SLUG}",
                 output_prefix=lambda wildcards: f"{RESULTS_DIR}/counts/rsem/{wildcards.sample}/{wildcards.sample}",
                 paired=lambda wildcards: "--paired-end" if sample_layout(SAMPLES, wildcards.sample) == "paired" else "",
+                strandedness=lambda wildcards: rsem_strandedness_arg(SAMPLES, wildcards.sample),
                 rendered=lambda wildcards: render_tool_params(config, "rsem", section="quant"),
-                extra=lambda wildcards: tool_extra(config, "rsem")
+                extra=lambda wildcards: tool_extra(config, "rsem", section="quant")
             shell:
                 """
                 mkdir -p $(dirname {params.output_prefix}) $(dirname {log})
-                rsem-calculate-expression --alignments {params.paired} -p {threads} \
+                rsem-calculate-expression --alignments {params.paired} {params.strandedness} -p {threads} \
                     {params.rendered} {params.extra} {input.bam} \
                     {params.reference_prefix} {params.output_prefix} > {log} 2>&1
                 """
@@ -325,12 +326,13 @@ if rsem_quant_enabled():
                 reference_prefix=lambda wildcards: f"{RESULTS_DIR}/reference/rsem/{GENOME_SLUG}/{GENOME_SLUG}",
                 output_prefix=lambda wildcards: f"{RESULTS_DIR}/counts/rsem/{wildcards.sample}/{wildcards.sample}",
                 paired=lambda wildcards: "--paired-end" if sample_layout(SAMPLES, wildcards.sample) == "paired" else "",
+                strandedness=lambda wildcards: rsem_strandedness_arg(SAMPLES, wildcards.sample),
                 rendered=lambda wildcards: render_tool_params(config, "rsem", section="quant"),
-                extra=lambda wildcards: tool_extra(config, "rsem")
+                extra=lambda wildcards: tool_extra(config, "rsem", section="quant")
             shell:
                 """
                 mkdir -p $(dirname {params.output_prefix}) $(dirname {log})
-                rsem-calculate-expression --alignments {params.paired} -p {threads} \
+                rsem-calculate-expression --alignments {params.paired} {params.strandedness} -p {threads} \
                     {params.rendered} {params.extra} {input.bam} \
                     {params.reference_prefix} {params.output_prefix} > {log} 2>&1
                 """

@@ -1,9 +1,15 @@
-# Editable SRA Toolkit profile.
+# fasterq-dump settings for sample rows containing sra_id. SnakeVerse supplies
+# accession, --split-files, threads, memory, temporary/output directories, and
+# pigz compression. FASTQ/SRA selection is detected per sample row.
+# Docs: https://github.com/ncbi/sra-tools/wiki/HowTo:-fasterq-dump
 tool: sra_tools
 version: "3"
 
-params: {}
+params:
+  fasterq_dump:
+    # Print periodic progress information into the rule log.
+    progress: false
 
-# Appended verbatim to the fasterq-dump command.
-extra: ""
-
+# Appended verbatim only to fasterq-dump.
+extra:
+  fasterq_dump: ""

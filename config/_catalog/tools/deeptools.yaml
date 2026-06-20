@@ -1,14 +1,23 @@
-# Editable deepTools bamCoverage profile.
+# deepTools bamCoverage settings. SnakeVerse supplies BAM/output paths, threads,
+# strand filtering, and effective genome size when the chosen normalization
+# requires it. Null/false/blank values are omitted.
+# Docs: https://deeptools.readthedocs.io/en/latest/content/tools/bamCoverage.html
 tool: deeptools
 version: "3.5"
 
 params:
+  # BigWig bin width in bases.
   bin_size: 10
+  # Coverage normalization method. Common values: CPM, BPM, RPGC, RPKM, None.
+  # RPGC additionally requires reference.effective_genome_size.
   normalize_using: CPM
+  # Exclude alignments below this MAPQ.
   min_mapping_quality: 10
+  # Exclude duplicate-marked alignments at coverage time.
   ignore_duplicates: false
+  # Extend reads to inferred/selected fragment length. Usually leave false for
+  # paired-end data because bamCoverage already knows the fragment span.
   extend_reads: false
 
-# Appended verbatim to the bamCoverage command.
+# Appended verbatim to bamCoverage for uncommon options.
 extra: ""
-

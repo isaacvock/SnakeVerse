@@ -25,13 +25,14 @@ rule bwa_mem2_align:
         reads=lambda wildcards, input: bwa_mem2_reads_arg(input.r1, input.r2),
         bwa_args=lambda wildcards: render_tool_params(config, "bwa_mem2", section="align"),
         sort_args=lambda wildcards: render_tool_params(config, "samtools", section="sort"),
-        extra=lambda wildcards: tool_extra(config, "bwa_mem2")
+        align_extra=lambda wildcards: tool_extra(config, "bwa_mem2", section="align"),
+        sort_extra=lambda wildcards: tool_extra(config, "samtools", section="sort")
     shell:
         """
         set -euo pipefail
         mkdir -p $(dirname {output.bam}) $(dirname {log})
-        bwa-mem2 mem -t {threads} {params.bwa_args} {params.extra} \
+        bwa-mem2 mem -t {threads} {params.bwa_args} {params.align_extra} \
             {params.index} {params.reads} 2> {log} \
-            | samtools sort -@ {threads} {params.sort_args} -o {output.bam} - 2>> {log}
+            | samtools sort -@ {threads} {params.sort_args} {params.sort_extra} -o {output.bam} - 2>> {log}
         samtools index {output.bam} {output.bai} 2>> {log}
         """

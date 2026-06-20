@@ -61,6 +61,19 @@ jobs:
             workflow/lib/tracks.py \
             workflow/lib/validation.py \
             workflow/scripts/gtf_to_gene_saf.py
+          PYTHONPATH=workflow/lib python - <<'PY'
+          from params import tool_extra
+          from samples import rsem_strandedness_arg
+
+          legacy = {"tools": {"x": {"extra": "--legacy"}}}
+          staged = {"tools": {"x": {"extra": {"index": "--large", "align": "--local"}}}}
+          assert tool_extra(legacy, "x", "align") == "--legacy"
+          assert tool_extra(staged, "x", "index") == "--large"
+          assert tool_extra(staged, "x", "align") == "--local"
+          assert tool_extra(staged, "x", "quant") == ""
+          sample = [{"sample_id": "s1", "unit_id": "u1", "strandedness": "reverse"}]
+          assert rsem_strandedness_arg(sample, "s1") == "--strandedness reverse"
+          PY
 
       - name: Helper script checks
         run: |
@@ -91,6 +104,9 @@ jobs:
             --genome hg38 \
             --run-name smoke
           python config/bin/ngsflow.py explain alignment
+          python config/bin/ngsflow.py explain tool rsem > rsem-explain.txt
+          grep -q "estimate_rspd" rsem-explain.txt
+          grep -q "SnakeVerse supplies FASTA/GTF/reference prefixes" rsem-explain.txt
           test -f config/runs/smoke.yaml
           test -f config/samples/smoke.tsv
           test -f config/references/hg38.yaml

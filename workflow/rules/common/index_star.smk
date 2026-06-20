@@ -20,7 +20,7 @@ rule star_index:
         genome_dir=lambda wildcards: aligner_index_prefix(config, RESULTS_DIR, "star"),
         gtf_arg=lambda wildcards: star_gtf_arg(config),
         rendered=lambda wildcards: render_tool_params(config, "star", section="index"),
-        extra=lambda wildcards: tool_extra(config, "star")
+        extra=lambda wildcards: tool_extra(config, "star", section="index")
     shell:
         """
         mkdir -p {params.genome_dir} $(dirname {log})

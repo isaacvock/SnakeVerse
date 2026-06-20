@@ -155,6 +155,15 @@ run from available but inactive tools. `validate` checks the run, sample
 columns, selected tools, adapter policy, contextual reference requirements,
 layouts, strandedness, and obvious missing paths.
 
+`explain tool <name>` prints the active tool file with its comments intact.
+Those comments describe each shipped parameter, the arguments SnakeVerse
+already supplies, and a link to the tool's own documentation. For example:
+
+```bash
+python config/bin/ngsflow.py explain tool rsem
+python config/bin/ngsflow.py explain tool star
+```
+
 ### 4. Run Snakemake
 
 Dry-run first, then remove `--dry-run`:
@@ -224,16 +233,31 @@ This boundary is enforced for high-risk duplicate settings. For example,
 adapter sequences in `fastp.yaml` or strandedness in `featurecounts.yaml` are
 validation errors because their authoritative locations are in the run file.
 
-Every tool file includes `extra`. Its value is appended verbatim to the tool
-command for specialized flags not represented by structured parameters:
+Tool files are intended to be readable without consulting workflow code. Their
+comments identify workflow-controlled arguments such as paths, threads,
+pairedness, and strandedness. Under `params`, `false`, `null`, and blank values
+are omitted; `true` emits a flag; and strings or numbers emit an option with a
+value. Tool-specific renderers translate friendly names such as
+`minimum_overlap` to the CLI's actual spelling.
+
+Every tool file also includes `extra` for specialized flags not represented by
+structured parameters. A single-command tool uses a string. A multi-command
+tool uses named strings so an option reaches only the intended command:
 
 ```yaml
 tool: bowtie2
 params:
   align:
     sensitivity: --very-sensitive
-extra: "--no-unal"
+extra:
+  index: ""
+  align: "--no-unal"
 ```
+
+Prefer documented `params` entries when available. `extra` is deliberately an
+escape hatch: SnakeVerse appends it verbatim and cannot validate the flags.
+RSEM, STAR, Bowtie2, BWA-MEM2, samtools, and SRA Toolkit profiles label their
+command stages explicitly where needed.
 
 ## Adapter Trimming
 

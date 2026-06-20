@@ -296,6 +296,12 @@ def sample_strandedness(samples: list[dict[str, str]], sample: str) -> str:
     return values.pop() or "unstranded"
 
 
+def rsem_strandedness_arg(samples: list[dict[str, str]], sample: str) -> str:
+    """Translate SnakeVerse sample-sheet values to RSEM's strandedness values."""
+    value = sample_strandedness(samples, sample)
+    return f"--strandedness {'none' if value == 'unstranded' else value}"
+
+
 def as_csv(values: Any) -> str:
     if isinstance(values, str):
         return values

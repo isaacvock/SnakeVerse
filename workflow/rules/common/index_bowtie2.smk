@@ -19,7 +19,7 @@ rule bowtie2_index:
     params:
         prefix=lambda wildcards: aligner_index_prefix(config, RESULTS_DIR, "bowtie2"),
         rendered=lambda wildcards: render_tool_params(config, "bowtie2", section="index"),
-        extra=lambda wildcards: tool_extra(config, "bowtie2")
+        extra=lambda wildcards: tool_extra(config, "bowtie2", section="index")
     shell:
         """
         mkdir -p $(dirname {params.prefix}) $(dirname {log})

@@ -349,8 +349,14 @@ def tool_profile(config: Mapping[str, Any], tool: str) -> Mapping[str, Any]:
     return config.get("tools", {}).get(tool, {})
 
 
-def tool_extra(config: Mapping[str, Any], tool: str) -> str:
-    return str(tool_profile(config, tool).get("extra") or "")
+def tool_extra(config: Mapping[str, Any], tool: str, section: str | None = None) -> str:
+    """Return verbatim CLI arguments, optionally scoped to one tool command."""
+    extra = tool_profile(config, tool).get("extra", "")
+    if isinstance(extra, Mapping):
+        if section is None:
+            return str(extra.get("default") or "")
+        return str(extra.get(section) or "")
+    return str(extra or "")
 
 
 def render_tool_params(

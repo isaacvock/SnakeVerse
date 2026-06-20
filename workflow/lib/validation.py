@@ -27,6 +27,7 @@ FEATURECOUNTS_RUN_KEYS = {
     "count_multimapping_reads",
     "count_overlapping_features",
 }
+RSEM_RUN_KEYS = {"alignments", "paired_end", "strandedness", "num_threads"}
 ADAPTER_TOOL_KEYS = {
     "fastp": {"detect_adapter_for_pe", "adapter_sequence", "adapter_sequence_r2"},
     "cutadapt": {"adapter_r1", "adapter_r2"},
@@ -180,6 +181,14 @@ def validate_resolved_config(
             settings.get("gene_results", True) or settings.get("isoform_results", True)
         ):
             errors.append(f"modules.{name} is enabled but requests no result type")
+    if _enabled(config, "rsem_quantification"):
+        rsem_quant = (active_tools.get("rsem", {}).get("params", {}) or {}).get("quant", {}) or {}
+        conflicts = sorted(RSEM_RUN_KEYS.intersection(rsem_quant))
+        if conflicts:
+            errors.append(
+                "RSEM layout, strandedness, and execution inputs are inferred by the workflow; "
+                "remove from tools/rsem.yaml params.quant: " + ", ".join(conflicts)
+            )
     if assay == "rnaseq" and transcript_quant:
         if not reference.get("gtf"):
             errors.append("reference.gtf is required by transcript quantification")

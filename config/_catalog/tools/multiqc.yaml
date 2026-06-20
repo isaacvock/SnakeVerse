@@ -1,10 +1,12 @@
-# Editable MultiQC profile.
+# MultiQC report behavior. SnakeVerse supplies the search directory, output
+# directory, and report filename.
+# Docs: https://docs.seqera.io/multiqc/
 tool: multiqc
 version: "1.25"
 
 params:
+  # Replace an existing report instead of refusing to run.
   force: true
 
-# Appended verbatim to the MultiQC command.
+# Appended verbatim before workflow-controlled search/output arguments.
 extra: ""
-

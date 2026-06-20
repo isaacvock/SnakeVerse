@@ -1,12 +1,23 @@
-# Editable BWA-MEM2 profile.
+# BWA-MEM2 policy. SnakeVerse supplies the reference/index, reads, layout,
+# threads, output stream, and samtools sorting.
+# Docs: https://github.com/bwa-mem2/bwa-mem2
 tool: bwa_mem2
 version: "2.2"
 
 params:
+  # bwa-mem2 index has no broadly useful structured defaults here. Put unusual
+  # index-only flags in extra.index.
   index: {}
   align:
+    # Emit shorter split hits as secondary alignments (-M), mainly for tools
+    # expecting the historical BWA-MEM interpretation. Usually leave false.
     mark_shorter_splits: false
+    # Minimum seed length (-k); blank preserves the BWA-MEM2 default.
+    min_seed_length:
+    # Band width (-w); blank preserves the BWA-MEM2 default.
+    band_width:
 
-# Appended verbatim to the bwa-mem2 mem command.
-extra: ""
-
+# Appended verbatim only to the corresponding subcommand.
+extra:
+  index: ""
+  align: ""

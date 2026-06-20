@@ -1,13 +1,20 @@
-# Editable samtools profile.
+# samtools execution details. Biological inclusion/exclusion policy belongs in
+# modules.bam_filter in the run file. SnakeVerse controls input/output paths,
+# threads, BAM format, and indexing.
+# Docs: https://www.htslib.org/doc/samtools.html
 tool: samtools
 version: "1.20"
 
 params:
   sort:
+    # Memory available to each sort thread (-m), not total job memory.
     memory_per_thread: 2G
 
 # BAM inclusion/exclusion policy is owned by modules.bam_filter in the run
 # config. This file controls only samtools-specific execution details.
 
-# Appended verbatim to samtools view in the filtering rule.
-extra: ""
+# Command-specific verbatim options. sort applies to alignment-output sorting;
+# filter applies to the first samtools view in the BAM-filtering rule.
+extra:
+  sort: ""
+  filter: ""

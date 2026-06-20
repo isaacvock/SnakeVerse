@@ -49,6 +49,7 @@ FEATURECOUNTS_RUN_KEYS = {
     "count_multimapping_reads",
     "count_overlapping_features",
 }
+RSEM_RUN_KEYS = {"alignments", "paired_end", "strandedness", "num_threads"}
 
 
 def require_yaml() -> None:
@@ -362,6 +363,14 @@ def validate_config(config: dict[str, Any]) -> tuple[list[str], list[str]]:
             settings.get("gene_results", True) or settings.get("isoform_results", True)
         ):
             errors.append(f"modules.{name} is enabled but requests no result type")
+    if module_enabled(config, "rsem_quantification"):
+        rsem_quant = (active_tools.get("rsem", {}).get("params", {}) or {}).get("quant", {}) or {}
+        conflicts = sorted(RSEM_RUN_KEYS.intersection(rsem_quant))
+        if conflicts:
+            errors.append(
+                "RSEM layout, strandedness, and execution inputs are inferred by the workflow; "
+                "remove from config/tools/rsem.yaml params.quant: " + ", ".join(conflicts)
+            )
     if assay == "atacseq" and module_enabled(config, "bam_filter") and not reference.get("blacklist"):
         warnings.append("ATAC-seq blacklist filtering is recommended; reference.blacklist is blank")
     if module_enabled(config, "tss_enrichment"):
@@ -549,8 +558,13 @@ def command_explain(args: argparse.Namespace) -> None:
         name = topic[1]
         if name not in config.get("tools", {}):
             raise ValueError(f"Tool '{name}' is not available. Add it with: ngsflow.py add-tool {name}")
-        print(f"Tool file: {config['_ngsflow']['tool_files'][name]}")
-        print(yaml.safe_dump(config["tools"][name], sort_keys=False).rstrip())
+        tool_label = config["_ngsflow"]["tool_files"][name]
+        tool_path = project_path(tool_label, Path(config["_ngsflow"]["project_root"]))
+        print(f"Tool file: {tool_label}")
+        print("Values under params are rendered as CLI options; false, null, and blank values are omitted.")
+        print("Values under extra are appended verbatim. Read the file comments for ownership and syntax.")
+        print()
+        print(tool_path.read_text(encoding="utf-8").rstrip())
     else:
         raise ValueError("Explain topics: trimming, alignment, reference, or tool <name>")
 

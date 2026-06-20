@@ -25,13 +25,14 @@ rule bowtie2_align:
         reads=lambda wildcards, input: bowtie2_reads_arg(input.r1, input.r2),
         bowtie2_args=lambda wildcards: render_tool_params(config, "bowtie2", section="align"),
         sort_args=lambda wildcards: render_tool_params(config, "samtools", section="sort"),
-        extra=lambda wildcards: tool_extra(config, "bowtie2")
+        align_extra=lambda wildcards: tool_extra(config, "bowtie2", section="align"),
+        sort_extra=lambda wildcards: tool_extra(config, "samtools", section="sort")
     shell:
         """
         set -euo pipefail
         mkdir -p $(dirname {output.bam}) $(dirname {log})
         bowtie2 -x {params.index} {params.reads} \
-            -p {threads} {params.bowtie2_args} {params.extra} 2> {log} \
-            | samtools sort -@ {threads} {params.sort_args} -o {output.bam} - 2>> {log}
+            -p {threads} {params.bowtie2_args} {params.align_extra} 2> {log} \
+            | samtools sort -@ {threads} {params.sort_args} {params.sort_extra} -o {output.bam} - 2>> {log}
         samtools index {output.bam} {output.bai} 2>> {log}
         """

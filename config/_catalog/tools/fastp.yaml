@@ -1,13 +1,25 @@
-# Editable fastp profile.
+# fastp trimming and filtering options. Adapter policy belongs in the run file
+# under modules.trimming.adapters so it has one obvious source of truth.
+# SnakeVerse supplies I/O paths, reports, paired/single layout, and threads.
+# Docs: https://github.com/OpenGene/fastp
 tool: fastp
 version: "0.23"
 
 params:
+  # A base at or above this Phred score is considered qualified.
   qualified_quality_phred: 20
+  # Discard reads shorter than this after trimming.
   length_required: 20
+  # Maximum percentage of low-quality bases allowed in a retained read.
+  unqualified_percent_limit: 40
+  # Sliding-window quality cutting is deliberately off by default. Enable only
+  # after reviewing fastp's cut_front/cut_tail/cut_right behavior.
+  cut_front: false
+  cut_tail: false
+  cut_right: false
 
 # Adapter policy and sequences are owned by modules.trimming.adapters in the
 # run config so they cannot silently conflict with this file.
 
-# Appended verbatim to the fastp command.
+# Appended verbatim to the fastp command for options not represented above.
 extra: ""

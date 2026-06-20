@@ -1,20 +1,28 @@
-# Editable MACS3 profile for ATAC-seq peak calling.
+# MACS3 callpeak policy for ATAC-seq. SnakeVerse infers BAM/BAMPE from the
+# sample layout and supplies treatment BAM, sample name, and output directory.
+# Docs: https://macs3-project.github.io/MACS/docs/callpeak.html
 tool: macs3
 version: "3"
 
 params:
   callpeak:
-    # genome_size can be set here, or inherited from the active reference's
-    # macs3_genome_size or effective_genome_size.
+    # Effective genome size (-g). Leave blank to inherit reference.macs3_genome_size
+    # or reference.effective_genome_size.
     genome_size:
+    # FDR cutoff for peak detection. Set pvalue instead and blank qvalue only if
+    # a p-value threshold is intentionally preferred.
     qvalue: 0.01
+    pvalue:
+    # Retain all duplicate fragments presented to MACS3. Upstream duplicate
+    # handling remains controlled by the run's mark/filter modules.
     keep_dup: all
+    # Emit a summits BED file in addition to narrowPeak output.
     call_summits: true
-    # For single-end ATAC-seq, users often set nomodel, shift, and extsize
-    # after choosing a project-specific insertion-site strategy.
+    # For single-end ATAC-seq, set these only after choosing an explicit
+    # insertion-site strategy. Blank values preserve MACS3 defaults.
     nomodel:
     shift:
     extsize:
 
-# Appended verbatim to the MACS3 callpeak command.
+# Appended verbatim to macs3 callpeak.
 extra: ""

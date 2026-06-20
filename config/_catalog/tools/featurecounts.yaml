@@ -1,10 +1,18 @@
-# Editable featureCounts profile.
+# Advanced featureCounts mechanics. The feature type, gene attribute,
+# strandedness, paired-read behavior, multimapping policy, and overlap policy
+# belong in modules.gene_counts in the run file and are rejected here.
+# SnakeVerse supplies annotations, BAMs, output paths, and threads.
+# Docs: https://subread.sourceforge.net/featureCounts.html
 tool: featurecounts
 version: "subread"
 
-# Advanced featureCounts-only options may be added here. Counting semantics
-# are owned by modules.gene_counts in the run config.
-params: {}
+params:
+  # Minimum number of overlapping bases required to assign a read. Blank uses
+  # the featureCounts default. This is a technical threshold, not gene identity.
+  minimum_overlap:
+  # Maximum non-overlapping bases allowed on either side. Blank uses the tool
+  # default. Review the featureCounts manual before setting it.
+  non_overlap:
 
-# Appended verbatim to the featureCounts command.
+# Appended verbatim after structured params and before workflow-controlled BAMs.
 extra: ""

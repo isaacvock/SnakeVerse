@@ -1,4 +1,4 @@
-from params import resource_value, tool_extra
+from params import render_tool_params, resource_value, tool_extra
 from samples import sample_by_unit
 
 
@@ -17,7 +17,8 @@ rule sra_fastq:
         workflow_file("envs/sra_tools.yaml")
     params:
         accession=lambda wildcards: sample_by_unit(SAMPLES, wildcards.unit).get("sra_id", ""),
-        extra=lambda wildcards: tool_extra(config, "sra_tools")
+        rendered=lambda wildcards: render_tool_params(config, "sra_tools", section="fasterq_dump"),
+        extra=lambda wildcards: tool_extra(config, "sra_tools", section="fasterq_dump")
     shell:
         """
         set -euo pipefail
@@ -34,7 +35,7 @@ rule sra_fastq:
 
         fasterq-dump "$accession" --split-files --threads {threads} \
             --mem {resources.mem_mb}M --temp "$tmpdir" --outdir "$tmpdir" \
-            {params.extra}
+            {params.rendered} {params.extra}
 
         if [ -s "$paired_r1" ]; then
             pigz -p {threads} -c "$paired_r1" > {output.r1:q}

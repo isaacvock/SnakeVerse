@@ -1,11 +1,14 @@
-# Editable FastQC profile.
+# FastQC options. SnakeVerse supplies the input FASTQ, output directory, and
+# thread count. Set a value to null/false to omit it; true emits a bare flag.
+# Docs: https://www.bioinformatics.babraham.ac.uk/projects/fastqc/
 tool: fastqc
 version: "0.12"
 
 params:
+  # Leave the FastQC HTML/ZIP report compressed instead of extracting it.
   noextract: true
+  # Suppress routine console progress messages. Errors still go to the log.
   quiet: false
 
-# Appended verbatim to the FastQC command.
+# Appended verbatim after params and before workflow-controlled I/O arguments.
 extra: ""
-

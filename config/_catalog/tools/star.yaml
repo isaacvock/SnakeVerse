@@ -1,23 +1,40 @@
-# Editable STAR profile.
+# STAR index and alignment policy. SnakeVerse supplies the genome directory,
+# FASTA/GTF, reads, paired/single layout, threads, output prefix, and BAM paths.
+# STAR option names retain their original camelCase spelling.
+# Docs: https://github.com/alexdobin/STAR/blob/master/doc/STARmanual.pdf
 tool: star
 version: "2.7.11b"
 
 params:
   index:
-    # REVIEW when read lengths differ substantially from 100 bp.
+    # Recommended value is read_length - 1. This affects splice-junction
+    # annotation in the index and should match the intended read length.
     sjdbOverhang: 99
+    # Usually auto-selected by STAR. Set only for unusually small references.
+    genomeSAindexNbases:
   align:
-    # REVIEW multimapping, mismatch, and end-alignment policy for the assay.
+    # Decompress gzipped inputs. Change only if your FASTQs require another
+    # reader command.
     readFilesCommand: zcat
+    # SnakeVerse expects a coordinate-sorted BAM at the path STAR produces.
     outSAMtype: "BAM SortedByCoordinate"
+    # Maximum number of reported loci before a read is considered unmapped.
     outFilterMultimapNmax: 20
+    # Maximum mismatch fraction relative to read length.
     outFilterMismatchNoverReadLmax: 0.04
+    # Minimum overhang for unannotated splice junctions.
     alignSJoverhangMin: 8
+    # Minimum overhang for annotated splice junctions.
     alignSJDBoverhangMin: 1
+    # EndToEnd forbids soft clipping; Local permits it. Review for your assay.
     alignEndsType: EndToEnd
+    # SAM tags retained for downstream QC and quantification.
     outSAMattributes: "NH HI AS NM MD"
-    # TranscriptomeSAM is honored only when the run requests a transcriptome BAM.
+    # GeneCounts asks STAR for its own count table. TranscriptomeSAM is retained
+    # only when the run requests a transcriptome BAM or transcript quantifier.
     quantMode: "GeneCounts TranscriptomeSAM"
 
-# Appended verbatim to the STAR command.
-extra: ""
+# Appended verbatim only to the corresponding STAR mode.
+extra:
+  index: ""
+  align: ""

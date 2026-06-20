@@ -31,7 +31,7 @@ rule samtools_filter:
         ),
         excluded_contigs=lambda wildcards: ",".join(config.get("modules", {}).get("bam_filter", {}).get("exclude_contigs", []) or []),
         blacklist=lambda wildcards: config.get("reference", {}).get("blacklist", "") or "",
-        extra=lambda wildcards: tool_extra(config, "samtools")
+        extra=lambda wildcards: tool_extra(config, "samtools", section="filter")
     shell:
         """
         set -euo pipefail

@@ -1,9 +1,13 @@
-# Editable bedtools profile.
+# bedtools is currently used internally for blacklist exclusion and ATAC-seq
+# overlap metrics. Those commands have workflow-defined arguments; this file is
+# present so the dependency and its version are visible, not as a false promise
+# that every bedtools subcommand is configurable here.
+# Docs: https://bedtools.readthedocs.io/en/latest/
 tool: bedtools
 version: "2.31"
 
+# Reserved for future, subcommand-specific structured options.
 params: {}
 
-# Reserved for future bedtools options.
+# Not currently appended to workflow-owned bedtools commands.
 extra: ""
-
