@@ -181,7 +181,7 @@ def resolve_config(configfile: str | Path) -> dict[str, Any]:
         tool_config = load_yaml(tool_path)
         name = str(tool_config.get("tool") or tool_path.stem)
         if name in tools:
-            raise ValueError(f"Duplicate active tool configuration for '{name}'")
+            raise ValueError(f"Duplicate tool configuration for '{name}'")
         tools[name] = tool_config
         tool_files[name] = display_path(tool_path, project_root)
 
@@ -289,7 +289,7 @@ def validate_config(config: dict[str, Any]) -> tuple[list[str], list[str]]:
     missing_tools = [name for name in required_tools(config, rows) if name not in active_tools]
     if missing_tools:
         errors.append(
-            "Missing active tool configurations: " + ", ".join(missing_tools)
+            "Missing tool configurations: " + ", ".join(missing_tools)
             + ". Add each with: python config/bin/ngsflow.py add-tool <tool>"
         )
 
@@ -400,6 +400,7 @@ def command_list(args: argparse.Namespace) -> None:
 
 def command_init_run(args: argparse.Namespace) -> None:
     project_root, config_root, catalog_root = script_paths()
+    assay = assay_entry(args.assay)
     recipe = recipe_entry(args.assay, args.recipe)
     replacements = {
         "RUN_NAME": args.run_name,
@@ -407,27 +408,47 @@ def command_init_run(args: argparse.Namespace) -> None:
         "ASSAY": args.assay,
         "RECIPE": args.recipe,
     }
-    jobs: list[tuple[Path, Path]] = [
-        (catalog_root / recipe["run_template"], config_root / "runs" / f"{args.run_name}.yaml"),
-        (catalog_root / recipe["sample_template"], config_root / "samples" / f"{args.run_name}.tsv"),
-        (catalog_root / "references" / f"{args.genome}.yaml", config_root / "references" / f"{args.genome}.yaml"),
+    jobs: list[tuple[Path, Path, bool]] = [
+        (catalog_root / recipe["run_template"], config_root / "runs" / f"{args.run_name}.yaml", False),
+        (catalog_root / recipe["sample_template"], config_root / "samples" / f"{args.run_name}.tsv", False),
+        (
+            catalog_root / "references" / f"{args.genome}.yaml",
+            config_root / "references" / f"{args.genome}.yaml",
+            True,
+        ),
     ]
     jobs.extend(
-        (catalog_root / "tools" / f"{tool}.yaml", config_root / "tools" / f"{tool}.yaml")
-        for tool in recipe.get("tools", [])
+        (
+            catalog_root / "tools" / f"{tool}.yaml",
+            config_root / "tools" / f"{tool}.yaml",
+            True,
+        )
+        for tool in assay.get("toolbox", [])
     )
-    missing_sources = [source for source, _ in jobs if not source.exists()]
+    missing_sources = [source for source, _, _ in jobs if not source.exists()]
     if missing_sources:
         raise FileNotFoundError("Catalog files are missing: " + ", ".join(map(str, missing_sources)))
-    conflicts = [destination for _, destination in jobs if destination.exists()]
+    conflicts = [
+        destination
+        for _, destination, shared in jobs
+        if destination.exists() and not shared
+    ]
     if conflicts and not (args.overwrite or args.skip_existing):
         raise FileExistsError(
             "Initialization would overwrite existing files:\n  "
             + "\n  ".join(display_path(path, project_root) for path in conflicts)
             + "\nUse --skip-existing to preserve them or --overwrite to replace them."
         )
-    for source, destination in jobs:
-        print(materialize(source, destination, replacements, args.overwrite, args.skip_existing))
+    for source, destination, shared in jobs:
+        print(
+            materialize(
+                source,
+                destination,
+                replacements,
+                args.overwrite,
+                args.skip_existing or shared,
+            )
+        )
     pointer = write_active_pointer(config_root, args.run_name)
     print(f"activate {display_path(pointer, project_root)}")
     print("\nEdit these files in order:")
@@ -479,9 +500,17 @@ def print_default_explanation(config: dict[str, Any]) -> None:
         state = "ON " if isinstance(settings, dict) and settings.get("enabled") else "off"
         tool = f" [{settings.get('tool')}]" if isinstance(settings, dict) and settings.get("tool") else ""
         print(f"  {state:3} {name}{tool}")
-    print("\nActive tool files:")
-    for name, path in meta.get("tool_files", {}).items():
+    rows, _ = load_samples(config)
+    used_tools = required_tools(config, rows)
+    tool_files = meta.get("tool_files", {})
+    print("\nTools used by this run:")
+    for name in used_tools:
+        path = tool_files.get(name, "<missing configuration>")
         print(f"  {name:18} {path}")
+    inactive_tools = sorted(set(tool_files).difference(used_tools))
+    if inactive_tools:
+        print("\nTools available but inactive:")
+        print("  " + ", ".join(inactive_tools))
     trimming = module(config, "trimming")
     alignment = module(config, "alignment")
     print("\nReview first:")
@@ -507,7 +536,7 @@ def command_explain(args: argparse.Namespace) -> None:
     elif topic[0] == "alignment":
         settings = module(config, "alignment")
         tool = str(settings.get("tool") or "")
-        print("The run file selects the aligner; its active tool file controls advanced CLI behavior.")
+        print("The run file selects the aligner; its available tool file controls advanced CLI behavior.")
         print(f"  selection: {settings}")
         print(f"  tool file: {config['_ngsflow'].get('tool_files', {}).get(tool, '<missing>')}")
         print(f"  index: {(config.get('reference', {}).get('indexes', {}) or {}).get(tool) or '<build from FASTA>'}")
@@ -519,7 +548,7 @@ def command_explain(args: argparse.Namespace) -> None:
     elif topic[0] == "tool" and len(topic) == 2:
         name = topic[1]
         if name not in config.get("tools", {}):
-            raise ValueError(f"Tool '{name}' is not active. Add it with: ngsflow.py add-tool {name}")
+            raise ValueError(f"Tool '{name}' is not available. Add it with: ngsflow.py add-tool {name}")
         print(f"Tool file: {config['_ngsflow']['tool_files'][name]}")
         print(yaml.safe_dump(config["tools"][name], sort_keys=False).rstrip())
     else:

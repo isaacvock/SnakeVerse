@@ -89,15 +89,26 @@ jobs:
             --assay rnaseq \
             --recipe star_featurecounts \
             --genome hg38 \
-            --run-name smoke \
-            --overwrite
+            --run-name smoke
           python config/bin/ngsflow.py explain alignment
           test -f config/runs/smoke.yaml
           test -f config/samples/smoke.tsv
           test -f config/references/hg38.yaml
           test -f config/tools/star.yaml
           test -f config/tools/featurecounts.yaml
-          test ! -e config/tools/sra_tools.yaml
+          test -f config/tools/cutadapt.yaml
+          test -f config/tools/sra_tools.yaml
+          test -f config/tools/bowtie2.yaml
+          test -f config/tools/bwa_mem2.yaml
+          test -f config/tools/salmon.yaml
+          test -f config/tools/rsem.yaml
+          echo "# preserve-me" >> config/tools/star.yaml
+          python config/bin/ngsflow.py init-run \
+            --assay generic \
+            --recipe fastq_to_bam \
+            --genome hg38 \
+            --run-name smoke-generic
+          grep -q "preserve-me" config/tools/star.yaml
 
       - name: Snakemake lint
         run: |

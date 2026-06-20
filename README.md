@@ -24,13 +24,13 @@ config/config.yaml          active-run pointer
 config/runs/<run>.yaml      complete pipeline and resource configuration
 config/samples/<run>.tsv    samples and input reads
 config/references/<ref>.yaml reference files and indexes
-config/tools/<tool>.yaml    advanced settings for tools used by your runs
+config/tools/<tool>.yaml    available advanced tool settings
 ```
 
 `config/_catalog/` is the shipped catalog of recipes, schemas, reference
 templates, and tool defaults. Its leading underscore is intentional: ordinary
-users should not need to edit it. `init-run` copies selected catalog entries
-into the active directories above.
+users should not need to edit it. `init-run` copies the recipe plus an
+assay-compatible toolbox into the active directories above.
 
 ### Recipes Are Generators
 
@@ -122,18 +122,15 @@ Initialization creates or activates these files. Edit them in this order:
 6. **`config/config.yaml`**: Normally do not edit this by hand. It simply points
    to `config/runs/rnaseq.yaml` and can be changed with `activate-run`.
 
-Only tools selected by the recipe are copied. If you later enable Salmon,
-RSEM, cutadapt, or a different aligner, materialize that tool's editable
-configuration explicitly:
+Initialization copies the assay's compatible toolbox, including optional
+trimmers, aligners, downloaders, and quantifiers. A tool file being present
+means the tool is available; only the run's modules and sample inputs determine
+which tools are actually used.
 
-```bash
-python config/bin/ngsflow.py add-tool salmon
-python config/bin/ngsflow.py add-tool bwa_mem2
-```
-
-Initializing another run may encounter shared reference or tool files. Use
-`--skip-existing` to preserve those active files. Use `--overwrite` only when
-you deliberately want to replace them with catalog defaults.
+Existing shared reference and tool files are preserved automatically when
+another run is initialized. Existing run and sample files still require
+`--skip-existing` to keep them or `--overwrite` to replace them. Because
+`--overwrite` also restores shared files to catalog defaults, use it carefully.
 
 ### 3. Understand and Validate It
 
@@ -153,9 +150,10 @@ python config/bin/ngsflow.py explain reference
 python config/bin/ngsflow.py explain tool star
 ```
 
-`explain` reports which file owns each setting. `validate` checks the run,
-sample columns, selected tools, adapter policy, contextual reference
-requirements, layouts, strandedness, and obvious missing paths.
+`explain` reports which file owns each setting and separates tools used by the
+run from available but inactive tools. `validate` checks the run, sample
+columns, selected tools, adapter policy, contextual reference requirements,
+layouts, strandedness, and obvious missing paths.
 
 ### 4. Run Snakemake
 
@@ -271,11 +269,8 @@ featureCounts `-s` value. Because featureCounts creates one matrix per run, all
 samples in that run must share a layout and strandedness.
 
 SRA accessions are detected per sample row. Set `sra_id`, leave the FASTQ paths
-blank, set `sra_layout` to `single` or `paired`, and add the SRA tool config:
-
-```bash
-python config/bin/ngsflow.py add-tool sra_tools
-```
+blank, and set `sra_layout` to `single` or `paired`. The assay toolbox already
+contains the SRA tool configuration.
 
 Rows with local FASTQ paths continue to use those files, so local and SRA-backed
 samples can coexist in one run. Downloads use fasterq-dump plus parallel pigz
@@ -324,10 +319,10 @@ MultiQC. It can also produce:
 - STAR transcript-coordinate BAMs
 - Salmon or RSEM gene and isoform quantification
 
-Enable these in the matching run modules and add inactive tool files when
-needed. STAR `quantMode` must include `TranscriptomeSAM` for transcriptome BAM,
-Salmon, or RSEM output. SnakeVerse intentionally stops at read counts and does
-not perform differential expression analysis.
+Enable these in the matching run modules; their tool files are already
+available. STAR `quantMode` must include `TranscriptomeSAM` for transcriptome
+BAM, Salmon, or RSEM output. SnakeVerse intentionally stops at read counts and
+does not perform differential expression analysis.
 
 ## ATAC-seq Behavior
 
@@ -426,7 +421,7 @@ remote source.
 
 1. Add a complete run template to `config/_catalog/recipes/`.
 2. Add its sample template and any new tool or reference templates.
-3. Register the recipe and selected tools in `config/_catalog/manifest.yaml`.
+3. Register the recipe and assay-compatible toolbox in `config/_catalog/manifest.yaml`.
 4. Reuse common rules, adding `workflow/rules/assays/<assay>.smk` only for new
    biological outputs.
 5. Add a rule-level Conda environment when introducing a new tool.

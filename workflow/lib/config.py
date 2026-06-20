@@ -85,7 +85,7 @@ def load_reference(
 def load_tool_profiles(
     config_root: str | Path,
 ) -> tuple[dict[str, dict[str, Any]], dict[str, Path]]:
-    """Load only active tool profiles from config/tools/*.yaml."""
+    """Load available editable tool profiles from config/tools/*.yaml."""
     tools_dir = Path(config_root) / "tools"
     tools: dict[str, dict[str, Any]] = {}
     paths: dict[str, Path] = {}
@@ -95,14 +95,14 @@ def load_tool_profiles(
         profile = load_yaml(tool_path)
         tool_name = str(profile.get("tool") or tool_path.stem)
         if tool_name in tools:
-            raise ConfigError(f"Duplicate active tool profile for '{tool_name}'")
+            raise ConfigError(f"Duplicate tool profile for '{tool_name}'")
         tools[tool_name] = profile
         paths[tool_name] = tool_path.resolve()
     return tools, paths
 
 
 def resolve_config(configfile: str | Path) -> dict[str, Any]:
-    """Resolve an active pointer into one run, one reference, and active tools."""
+    """Resolve an active pointer into one run, one reference, and available tools."""
     project_root = _project_root_from_configfile(configfile)
     config_path = _resolve_project_path(configfile, project_root)
     pointer_config = load_yaml(config_path)

@@ -139,7 +139,7 @@ def validate_resolved_config(
     missing_tools = [tool for tool in _required_tools(config, samples) if tool not in active_tools]
     if missing_tools:
         errors.append(
-            "Missing active tool configurations: "
+            "Missing tool configurations: "
             + ", ".join(missing_tools)
             + ". Add each with: python config/bin/ngsflow.py add-tool <tool>"
         )
