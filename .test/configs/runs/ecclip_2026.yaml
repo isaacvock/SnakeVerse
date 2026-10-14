@@ -1,0 +1,67 @@
+schema_version: 2
+created_from: {recipe: karimzadeh_ecclip_2026, version: 1}
+project: {name: snakeverse_ci, run_name: ecclip_2026}
+assay: eclip
+samples: .test/configs/samples/ecclip_2026.tsv
+reference: .test/configs/references/eclip_test_genome.yaml
+results_dir: .test/results/ecclip_2026
+preprocessing: {input_stage: raw}
+
+modules:
+  fastq_qc: {enabled: true}
+  inline_barcode_demultiplexing: {enabled: false}
+  umi_extraction:
+    enabled: true
+    method: string
+    read1: {role: biological}
+    read2: {pattern: NNNNNNNN, location: 5prime, role: umi_only}
+  trimming:
+    enabled: true
+    tool: cutadapt
+    adapters: {mode: sequences, read1: "A{18}", read2: null}
+    params: {cut_r1: 3, quality_cutoff: 15, minimum_length: 20, times: 1}
+  alignment:
+    enabled: true
+    tool: star
+    transcriptome_bam: false
+    params:
+      align: {outFilterMultimapNmax: 1, alignEndsType: EndToEnd, quantMode: ""}
+  mark_duplicates: {enabled: false}
+  bam_filter:
+    enabled: true
+    min_mapq: 255
+    required_flags: null
+    excluded_flags: 2820
+    keep_duplicates: true
+    exclude_contigs: []
+  umi_deduplication:
+    enabled: true
+    method: directional
+    edit_distance: 1
+    strand_aware: true
+    spliced_is_unique: true
+    umi_tag: RX
+    qname_regex: "_(?P<umi>[ACGTN]+)$"
+  bam_qc: {enabled: true}
+  coverage:
+    enabled: true
+    strand_mode: separate
+    read: R1
+    strand: alignment
+    params: {bin_size: 10, normalize_using: CPM, min_mapping_quality: 10}
+  crosslink_sites: {enabled: true, read: R1, end: 5prime, strand: alignment, min_mapping_quality: 10}
+  enrichment: {enabled: true, read: R1, strand: alignment, bin_size: 50, pseudocount: 1, min_mapping_quality: 10}
+  multiqc: {enabled: true}
+
+resources:
+  fastqc: {threads: 1, mem_mb: 512, runtime_min: 15}
+  umi_tools_extract: {threads: 1, mem_mb: 512, runtime_min: 15}
+  cutadapt: {threads: 1, mem_mb: 512, runtime_min: 15}
+  star: {threads: 2, mem_mb: 2048, runtime_min: 60}
+  star_index: {threads: 2, mem_mb: 2048, runtime_min: 60}
+  samtools_filter: {threads: 1, mem_mb: 512, runtime_min: 15}
+  umi_tools_tag: {threads: 1, mem_mb: 512, runtime_min: 15}
+  umi_tools_dedup: {threads: 1, mem_mb: 1024, runtime_min: 30}
+  samtools_qc: {threads: 1, mem_mb: 512, runtime_min: 15}
+  deeptools: {threads: 1, mem_mb: 1024, runtime_min: 30}
+  multiqc: {threads: 1, mem_mb: 512, runtime_min: 15}

@@ -37,3 +37,5 @@ dependencies:
   - bedtools
   - macs3
   - multiqc
+  - umi_tools=1.1.6
+  - pysam

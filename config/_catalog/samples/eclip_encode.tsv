@@ -1,0 +1,5 @@
+sample_id	unit_id	fastq_1	fastq_2	condition	replicate	library_type	target	pool_id	input_sample_id	inline_barcodes	sra_id	sra_layout
+PUM2_IP_rep1	L001	fastq/eclip_pool_R1.fastq.gz	fastq/eclip_pool_R2.fastq.gz	K562	1	ip	PUM2	eclip_pool_1	PUM2_SMInput_rep1	A01=ATTGCTT,B06=ACAAGCC		
+PUM2_SMInput_rep1	L001	fastq/PUM2_SMInput_rep1_R1.fastq.gz	fastq/PUM2_SMInput_rep1_R2.fastq.gz	K562	1	sm_input	PUM2	sminput_1			
+# Multiple rows may repeat one pool's FASTQs. Barcode names must be unique within that pool.
+# Tag-only controls use library_type=tag_control and are never used as enrichment denominators.

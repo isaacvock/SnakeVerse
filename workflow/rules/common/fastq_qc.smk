@@ -1,10 +1,12 @@
 from params import render_tool_params, resource_value, tool_extra
-from samples import fastq_for_read
+from samples import fastqc_input_fastq
 
 
 rule fastqc:
     input:
-        lambda wildcards: fastq_for_read(SAMPLES, wildcards.unit, wildcards.read, RESULTS_DIR)
+        lambda wildcards: fastqc_input_fastq(
+            config, SAMPLES, wildcards.unit, wildcards.read, RESULTS_DIR
+        )
     output:
         directory(f"{RESULTS_DIR}/qc/fastqc/{{unit}}.{{read}}")
     log:

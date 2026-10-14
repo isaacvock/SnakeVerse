@@ -1,12 +1,16 @@
-from params import render_tool_params, resource_value, tool_extra, trimming_adapter_params
-from samples import fastq_for_read, optional_fastq_for_read, unit_layout
+from params import module_tool_extra, render_tool_params, resource_value, trimming_adapter_params
+from samples import optional_pre_trimming_fastq_for_read, pre_trimming_fastq_for_read, processed_unit_layout
 
 
 if TRIMMING_TOOL == "fastp":
     rule fastp:
         input:
-            r1=lambda wildcards: fastq_for_read(SAMPLES, wildcards.unit, "R1", RESULTS_DIR),
-            r2=lambda wildcards: optional_fastq_for_read(SAMPLES, wildcards.unit, "R2", RESULTS_DIR)
+            r1=lambda wildcards: pre_trimming_fastq_for_read(
+                config, SAMPLES, wildcards.unit, "R1", RESULTS_DIR
+            ),
+            r2=lambda wildcards: optional_pre_trimming_fastq_for_read(
+                config, SAMPLES, wildcards.unit, "R2", RESULTS_DIR
+            )
         output:
             r1=f"{RESULTS_DIR}/fastq/trimmed/{{unit}}_R1.fastq.gz",
             r2=f"{RESULTS_DIR}/fastq/trimmed/{{unit}}_R2.fastq.gz",
@@ -22,15 +26,16 @@ if TRIMMING_TOOL == "fastp":
         conda:
             workflow_file("envs/fastp.yaml")
         params:
-            layout=lambda wildcards: unit_layout(SAMPLES, wildcards.unit),
+            layout=lambda wildcards: processed_unit_layout(config, SAMPLES, wildcards.unit),
             rendered=lambda wildcards: render_tool_params(
                 config,
                 "fastp",
                 overrides=trimming_adapter_params(
-                    config, "fastp", unit_layout(SAMPLES, wildcards.unit) == "paired"
+                    config, "fastp", processed_unit_layout(config, SAMPLES, wildcards.unit) == "paired"
                 ),
+                module="trimming",
             ),
-            extra=lambda wildcards: tool_extra(config, "fastp")
+            extra=lambda wildcards: module_tool_extra(config, "trimming", "fastp")
         shell:
             """
             mkdir -p $(dirname {output.r1}) $(dirname {output.html}) $(dirname {log})
@@ -49,8 +54,12 @@ if TRIMMING_TOOL == "fastp":
 elif TRIMMING_TOOL == "cutadapt":
     rule cutadapt:
         input:
-            r1=lambda wildcards: fastq_for_read(SAMPLES, wildcards.unit, "R1", RESULTS_DIR),
-            r2=lambda wildcards: optional_fastq_for_read(SAMPLES, wildcards.unit, "R2", RESULTS_DIR)
+            r1=lambda wildcards: pre_trimming_fastq_for_read(
+                config, SAMPLES, wildcards.unit, "R1", RESULTS_DIR
+            ),
+            r2=lambda wildcards: optional_pre_trimming_fastq_for_read(
+                config, SAMPLES, wildcards.unit, "R2", RESULTS_DIR
+            )
         output:
             r1=f"{RESULTS_DIR}/fastq/trimmed/{{unit}}_R1.fastq.gz",
             r2=f"{RESULTS_DIR}/fastq/trimmed/{{unit}}_R2.fastq.gz"
@@ -64,15 +73,16 @@ elif TRIMMING_TOOL == "cutadapt":
         conda:
             workflow_file("envs/cutadapt.yaml")
         params:
-            layout=lambda wildcards: unit_layout(SAMPLES, wildcards.unit),
+            layout=lambda wildcards: processed_unit_layout(config, SAMPLES, wildcards.unit),
             rendered=lambda wildcards: render_tool_params(
                 config,
                 "cutadapt",
                 overrides=trimming_adapter_params(
-                    config, "cutadapt", unit_layout(SAMPLES, wildcards.unit) == "paired"
+                    config, "cutadapt", processed_unit_layout(config, SAMPLES, wildcards.unit) == "paired"
                 ),
+                module="trimming",
             ),
-            extra=lambda wildcards: tool_extra(config, "cutadapt")
+            extra=lambda wildcards: module_tool_extra(config, "trimming", "cutadapt")
         shell:
             """
             mkdir -p $(dirname {output.r1}) $(dirname {log})

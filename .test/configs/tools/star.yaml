@@ -4,7 +4,7 @@ version: "2.7.11b"
 params:
   index:
     sjdbOverhang: 49
-    genomeSAindexNbases: 10
+    genomeSAindexNbases: 6
   align:
     readFilesCommand: zcat
     outSAMtype: "BAM SortedByCoordinate"

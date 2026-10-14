@@ -1,0 +1,11 @@
+# UMI-tools extraction and deduplication defaults. Protocol layout, clustering
+# method, edit distance, and QNAME parsing belong to the run modules.
+# Docs: https://umi-tools.readthedocs.io/
+tool: umi_tools
+version: "1.1.6"
+
+params: {}
+
+# Appended to both extract and dedup commands when a run module does not
+# provide a more specific override.
+extra: ""

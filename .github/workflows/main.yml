@@ -43,6 +43,8 @@ jobs:
             rsem
             deeptools
             multiqc
+            umi_tools
+            pysam
           condarc: |
             channels:
               - conda-forge
@@ -58,9 +60,11 @@ jobs:
             workflow/lib/params.py \
             workflow/lib/refs.py \
             workflow/lib/samples.py \
+            workflow/lib/clip.py \
             workflow/lib/tracks.py \
             workflow/lib/validation.py \
-            workflow/scripts/gtf_to_gene_saf.py
+            workflow/scripts/gtf_to_gene_saf.py \
+            workflow/scripts/qname_umi_to_rx.py
           PYTHONPATH=workflow/lib python - <<'PY'
           from params import tool_extra
           from samples import rsem_strandedness_arg
@@ -74,6 +78,12 @@ jobs:
           sample = [{"sample_id": "s1", "unit_id": "u1", "strandedness": "reverse"}]
           assert rsem_strandedness_arg(sample, "s1") == "--strandedness reverse"
           PY
+          pytest -q tests/test_eclip.py
+
+      - name: Generate CLIP fixtures
+        run: |
+          python .test/scripts/generate_eclip_fastqs.py
+          bash .test/scripts/smoke_eclip_preprocessing.sh
 
       - name: Helper script checks
         run: |
@@ -81,6 +91,7 @@ jobs:
           python config/bin/ngsflow.py list recipes --assay generic
           python config/bin/ngsflow.py list recipes --assay rnaseq
           python config/bin/ngsflow.py list recipes --assay atacseq
+          python config/bin/ngsflow.py list recipes --assay eclip
           python config/bin/ngsflow.py explain --configfile .test/configs/generic.yaml
           python config/bin/ngsflow.py explain alignment --configfile .test/configs/generic.yaml
           python config/bin/ngsflow.py explain trimming --configfile .test/configs/generic.yaml
@@ -92,6 +103,10 @@ jobs:
           python config/bin/ngsflow.py explain --configfile .test/configs/generic_bwa_mem2.yaml
           python config/bin/ngsflow.py validate --configfile .test/configs/generic_bwa_mem2.yaml
           python config/bin/ngsflow.py validate --configfile .test/configs/generic_sra.yaml
+          python config/bin/ngsflow.py explain preprocessing --configfile .test/configs/eclip_encode.yaml
+          python config/bin/ngsflow.py validate --configfile .test/configs/eclip_encode.yaml
+          python config/bin/ngsflow.py validate --configfile .test/configs/ecclip_2026.yaml
+          python config/bin/ngsflow.py validate --configfile .test/configs/eclip_preextracted.yaml
 
       - name: Recipe initialization smoke test
         run: |
@@ -125,6 +140,17 @@ jobs:
             --genome hg38 \
             --run-name smoke-generic
           grep -q "preserve-me" config/tools/star.yaml
+          python config/bin/ngsflow.py init-run \
+            --assay eclip \
+            --recipe encode_eclip \
+            --genome hg38 \
+            --run-name smoke-eclip
+          python config/bin/ngsflow.py init-run \
+            --assay eclip \
+            --recipe karimzadeh_ecclip_2026 \
+            --genome hg38 \
+            --run-name smoke-ecclip
+          test -f config/tools/umi_tools.yaml
 
       - name: Snakemake lint
         run: |
@@ -132,6 +158,9 @@ jobs:
           snakemake --snakefile workflow/Snakefile --configfile .test/configs/rnaseq.yaml --lint
           snakemake --snakefile workflow/Snakefile --configfile .test/configs/atacseq.yaml --lint
           snakemake --snakefile workflow/Snakefile --configfile .test/configs/generic_bwa_mem2.yaml --lint
+          snakemake --snakefile workflow/Snakefile --configfile .test/configs/eclip_encode.yaml --lint
+          snakemake --snakefile workflow/Snakefile --configfile .test/configs/ecclip_2026.yaml --lint
+          snakemake --snakefile workflow/Snakefile --configfile .test/configs/eclip_preextracted.yaml --lint
 
       - name: Snakemake dry-runs
         run: |
@@ -140,6 +169,9 @@ jobs:
           snakemake --snakefile workflow/Snakefile --configfile .test/configs/atacseq.yaml --dry-run --cores 2 --printshellcmds
           snakemake --snakefile workflow/Snakefile --configfile .test/configs/generic_bwa_mem2.yaml --dry-run --cores 2 --printshellcmds
           snakemake --snakefile workflow/Snakefile --configfile .test/configs/generic_sra.yaml --dry-run --cores 2 --printshellcmds
+          snakemake --snakefile workflow/Snakefile --configfile .test/configs/eclip_encode.yaml --dry-run --cores 2 --printshellcmds
+          snakemake --snakefile workflow/Snakefile --configfile .test/configs/ecclip_2026.yaml --dry-run --cores 2 --printshellcmds
+          snakemake --snakefile workflow/Snakefile --configfile .test/configs/eclip_preextracted.yaml --dry-run --cores 2 --printshellcmds
 
       - name: Full generic FASTQ-to-BAM run
         run: |
@@ -180,3 +212,38 @@ jobs:
           test -s .test/results/atacseq/qc/atac/K562_ATAC_rep2.frip.txt
           test -e .test/results/atacseq/peaks/macs3/K562_ATAC_rep1/K562_ATAC_rep1_peaks.narrowPeak
           test -e .test/results/atacseq/peaks/macs3/K562_ATAC_rep2/K562_ATAC_rep2_peaks.narrowPeak
+
+      - name: Full conventional eCLIP run
+        run: |
+          snakemake --snakefile workflow/Snakefile \
+            --configfile .test/configs/eclip_encode.yaml \
+            --cores 2 --printshellcmds --show-failed-logs --latency-wait 30
+          test -s .test/results/eclip_encode/bam/pre_dedup/PUM2_IP_1.bam
+          test -s .test/results/eclip_encode/bam/umi_dedup/PUM2_IP_1.bam
+          samtools view .test/results/eclip_encode/bam/pre_dedup/PUM2_IP_1.bam | grep -q 'RX:Z:'
+          test "$(samtools view -c .test/results/eclip_encode/bam/umi_dedup/PUM2_IP_1.bam)" \
+            -lt "$(samtools view -c .test/results/eclip_encode/bam/pre_dedup/PUM2_IP_1.bam)"
+          test -s .test/results/eclip_encode/tracks/crosslink_sites/PUM2_IP_1.plus.bw
+          test -s .test/results/eclip_encode/tracks/enrichment/PUM2_IP_1.vs.PUM2_SMI_1.plus.bw
+
+      - name: Full Karimzadeh ecCLIP run
+        run: |
+          snakemake --snakefile workflow/Snakefile \
+            --configfile .test/configs/ecclip_2026.yaml \
+            --cores 2 --printshellcmds --show-failed-logs --latency-wait 30
+          test -s .test/results/ecclip_2026/bam/pre_dedup/RBP_IP_1.bam
+          test -s .test/results/ecclip_2026/bam/umi_dedup/RBP_IP_1.bam
+          samtools view .test/results/ecclip_2026/bam/pre_dedup/RBP_IP_1.bam | grep -q 'RX:Z:'
+          test "$(samtools view -c .test/results/ecclip_2026/bam/umi_dedup/RBP_IP_1.bam)" \
+            -lt "$(samtools view -c .test/results/ecclip_2026/bam/pre_dedup/RBP_IP_1.bam)"
+          test -s .test/results/ecclip_2026/tracks/crosslink_sites/RBP_IP_1.plus.bw
+          test ! -e .test/results/ecclip_2026/tracks/enrichment/RBP_IP_1.vs.TAG_1.plus.bw
+
+      - name: Full pre-extracted eCLIP run
+        run: |
+          snakemake --snakefile workflow/Snakefile \
+            --configfile .test/configs/eclip_preextracted.yaml \
+            --cores 2 --printshellcmds --show-failed-logs --latency-wait 30
+          samtools view .test/results/eclip_preextracted/bam/pre_dedup/PRE_IP_1.bam | grep -q 'RX:Z:'
+          test "$(samtools view -c .test/results/eclip_preextracted/bam/umi_dedup/PRE_IP_1.bam)" \
+            -lt "$(samtools view -c .test/results/eclip_preextracted/bam/pre_dedup/PRE_IP_1.bam)"

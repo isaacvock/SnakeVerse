@@ -1,4 +1,4 @@
-from params import render_tool_params, resource_value, tool_extra
+from params import module_tool_extra, render_tool_params, resource_value, tool_extra
 from refs import aligner_index_inputs, aligner_index_prefix
 from samples import bwa_mem2_reads_arg
 
@@ -23,9 +23,9 @@ rule bwa_mem2_align:
     params:
         index=lambda wildcards: aligner_index_prefix(config, RESULTS_DIR, "bwa_mem2"),
         reads=lambda wildcards, input: bwa_mem2_reads_arg(input.r1, input.r2),
-        bwa_args=lambda wildcards: render_tool_params(config, "bwa_mem2", section="align"),
+        bwa_args=lambda wildcards: render_tool_params(config, "bwa_mem2", section="align", module="alignment"),
         sort_args=lambda wildcards: render_tool_params(config, "samtools", section="sort"),
-        align_extra=lambda wildcards: tool_extra(config, "bwa_mem2", section="align"),
+        align_extra=lambda wildcards: module_tool_extra(config, "alignment", "bwa_mem2", section="align"),
         sort_extra=lambda wildcards: tool_extra(config, "samtools", section="sort")
     shell:
         """

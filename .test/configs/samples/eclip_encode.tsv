@@ -1,0 +1,3 @@
+sample_id	unit_id	fastq_1	fastq_2	condition	replicate	library_type	target	pool_id	input_sample_id	inline_barcodes	sra_id	sra_layout
+PUM2_IP_1	L001	.test/generated/eclip/encode_pool_R1.fastq.gz	.test/generated/eclip/encode_pool_R2.fastq.gz	K562	1	ip	PUM2	encode_pool	PUM2_SMI_1	A01=ATTGCTT,B06=ACAAGCC		
+PUM2_SMI_1	L001	.test/generated/eclip/encode_smi_R1.fastq.gz	.test/generated/eclip/encode_smi_R2.fastq.gz	K562	1	sm_input	PUM2					

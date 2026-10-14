@@ -1,0 +1,3 @@
+sample_id	unit_id	fastq_1	fastq_2	condition	replicate	library_type	target	pool_id	input_sample_id	inline_barcodes	sra_id	sra_layout
+RBP_IP_1	L001	.test/generated/eclip/ecclip_ip_R1.fastq.gz	.test/generated/eclip/ecclip_ip_R2.fastq.gz	K562	1	ip	RBP					
+TAG_1	L001	.test/generated/eclip/ecclip_tag_R1.fastq.gz	.test/generated/eclip/ecclip_tag_R2.fastq.gz	K562	1	tag_control	tag					

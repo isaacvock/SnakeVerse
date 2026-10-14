@@ -61,3 +61,25 @@ assays:
         description: "ENCODE4-oriented Bowtie2 alignment, filtering, MACS3 peaks, signal, and QC."
         run_template: recipes/atacseq_encode4.yaml
         sample_template: samples/atacseq.tsv
+
+  eclip:
+    description: "eCLIP/ecCLIP alignment, UMI deduplication, and CLIP signal tracks."
+    toolbox:
+      - fastqc
+      - cutadapt
+      - fastp
+      - sra_tools
+      - umi_tools
+      - star
+      - samtools
+      - deeptools
+      - multiqc
+    recipes:
+      encode_eclip:
+        description: "Conventional paired-end ENCODE eCLIP with inline barcodes and a 5-nt R2 UMI."
+        run_template: recipes/eclip_encode.yaml
+        sample_template: samples/eclip_encode.tsv
+      karimzadeh_ecclip_2026:
+        description: "Karimzadeh et al. ecCLIP with an 8-nt UMI-only R2 and single-end R1 alignment."
+        run_template: recipes/ecclip_karimzadeh_2026.yaml
+        sample_template: samples/ecclip_karimzadeh_2026.tsv

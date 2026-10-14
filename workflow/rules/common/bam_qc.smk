@@ -8,6 +8,8 @@ rule samtools_bam_qc:
     output:
         flagstat=f"{RESULTS_DIR}/qc/bam/{{sample}}.flagstat.txt",
         idxstats=f"{RESULTS_DIR}/qc/bam/{{sample}}.idxstats.txt"
+    wildcard_constraints:
+        sample="[^/]+"
     log:
         f"{RESULTS_DIR}/logs/samtools/qc.{{sample}}.log"
     threads:

@@ -34,6 +34,7 @@ sys.path.insert(0, str(WORKFLOW_LIB_DIR))
 WORKFLOW_LIB_MODULES = [
     ("snakeverse_config", "lib/config.py"),
     ("samples", "lib/samples.py"),
+    ("clip", "lib/clip.py"),
     ("refs", "lib/refs.py"),
     ("params", "lib/params.py"),
     ("tracks", "lib/tracks.py"),
@@ -61,6 +62,7 @@ from samples import (
     bigwig_targets,
     filtered_bam_targets,
     fastqc_targets,
+    input_fastqc_targets,
     has_sra_samples,
     load_samples,
     markdup_bam_targets,
@@ -68,6 +70,9 @@ from samples import (
     sample_ids,
     transcriptome_bam_targets,
     trimmed_fastq_targets,
+    demultiplexing_active,
+    umi_extraction_active,
+    sample_by_unit,
 )
 from refs import genome_slug
 from validation import validate_resolved_config
@@ -118,6 +123,10 @@ markdup_bam_path = lambda sample: f"{RESULTS_DIR}/bam/markdup/{sample}.bam"
 markdup_bai_path = lambda sample: f"{RESULTS_DIR}/bam/markdup/{sample}.bam.bai"
 filtered_bam_path = lambda sample: f"{RESULTS_DIR}/bam/filtered/{sample}.bam"
 filtered_bai_path = lambda sample: f"{RESULTS_DIR}/bam/filtered/{sample}.bam.bai"
+pre_dedup_bam_path = lambda sample: f"{RESULTS_DIR}/bam/pre_dedup/{sample}.bam"
+pre_dedup_bai_path = lambda sample: f"{RESULTS_DIR}/bam/pre_dedup/{sample}.bam.bai"
+umi_dedup_bam_path = lambda sample: f"{RESULTS_DIR}/bam/umi_dedup/{sample}.bam"
+umi_dedup_bai_path = lambda sample: f"{RESULTS_DIR}/bam/umi_dedup/{sample}.bam.bai"
 pre_filter_bam_path = lambda sample: (
     markdup_bam_path(sample) if module_enabled("mark_duplicates") else raw_bam_path(sample)
 )
@@ -125,17 +134,25 @@ pre_filter_bai_path = lambda sample: (
     markdup_bai_path(sample) if module_enabled("mark_duplicates") else raw_bai_path(sample)
 )
 final_bam_path = lambda sample: (
-    filtered_bam_path(sample) if module_enabled("bam_filter") else pre_filter_bam_path(sample)
+    umi_dedup_bam_path(sample)
+    if module_enabled("umi_deduplication")
+    else filtered_bam_path(sample)
+    if module_enabled("bam_filter")
+    else pre_filter_bam_path(sample)
 )
 final_bai_path = lambda sample: (
-    filtered_bai_path(sample) if module_enabled("bam_filter") else pre_filter_bai_path(sample)
+    umi_dedup_bai_path(sample)
+    if module_enabled("umi_deduplication")
+    else filtered_bai_path(sample)
+    if module_enabled("bam_filter")
+    else pre_filter_bai_path(sample)
 )
 
 alignment_r1 = lambda wildcards: alignment_fastq_1(
-    SAMPLES, wildcards.sample, RESULTS_DIR, trimming_for_alignment()
+    config, SAMPLES, wildcards.sample, RESULTS_DIR, trimming_for_alignment()
 )
 alignment_r2 = lambda wildcards: alignment_fastq_2(
-    SAMPLES, wildcards.sample, RESULTS_DIR, trimming_for_alignment()
+    config, SAMPLES, wildcards.sample, RESULTS_DIR, trimming_for_alignment()
 )
 
 
@@ -152,6 +169,9 @@ if has_sra_samples(SAMPLES):
     include: workflow_file("rules/common/sra_download.smk")
 
 include: workflow_file("rules/common/fastq_qc.smk")
+
+if demultiplexing_active(config) or umi_extraction_active(config):
+    include: workflow_file("rules/common/fastq_preprocessing.smk")
 
 if module_enabled("trimming"):
     include: workflow_file("rules/common/trimming.smk")
@@ -173,6 +193,10 @@ include: workflow_file("rules/common/bam_filter.smk")
 include: workflow_file("rules/common/mark_duplicates.smk")
 include: workflow_file("rules/common/bam_qc.smk")
 include: workflow_file("rules/common/coverage.smk")
+if module_enabled("umi_deduplication"):
+    include: workflow_file("rules/common/umi_deduplication.smk")
+if module_enabled("crosslink_sites") or module_enabled("enrichment"):
+    include: workflow_file("rules/common/clip_tracks.smk")
 include: workflow_file("rules/common/multiqc.smk")
 
 if config["assay"] == "generic":
@@ -181,5 +205,7 @@ elif config["assay"] == "rnaseq":
     include: workflow_file("rules/assays/rnaseq.smk")
 elif config["assay"] == "atacseq":
     include: workflow_file("rules/assays/atacseq.smk")
+elif config["assay"] == "eclip":
+    include: workflow_file("rules/assays/eclip.smk")
 else:
     raise ValueError(f"Unsupported assay: {config['assay']}")

@@ -6,6 +6,8 @@ It currently supports:
 - generic FASTQ-to-BAM processing with Bowtie2, STAR, or BWA-MEM2
 - bulk RNA-seq with STAR and featureCounts, plus optional Salmon or RSEM
 - ENCODE-oriented ATAC-seq with Bowtie2, MACS3, signal tracks, and QC
+- conventional eCLIP and Karimzadeh et al. ecCLIP with inline-barcode
+  demultiplexing, UMI-aware BAM deduplication, and CLIP signal tracks
 
 Snakemake remains the runner. The local `ngsflow.py` script only creates,
 explains, and validates configuration files; it never submits or executes the
@@ -145,6 +147,7 @@ Ask focused questions when needed:
 
 ```bash
 python config/bin/ngsflow.py explain trimming
+python config/bin/ngsflow.py explain preprocessing
 python config/bin/ngsflow.py explain alignment
 python config/bin/ngsflow.py explain reference
 python config/bin/ngsflow.py explain tool star
@@ -203,6 +206,26 @@ python config/bin/ngsflow.py init-run \
   --run-name atacseq
 ```
 
+Conventional ENCODE eCLIP:
+
+```bash
+python config/bin/ngsflow.py init-run \
+  --assay eclip \
+  --recipe encode_eclip \
+  --genome hg38 \
+  --run-name pum2_eclip
+```
+
+Karimzadeh et al. ecCLIP:
+
+```bash
+python config/bin/ngsflow.py init-run \
+  --assay eclip \
+  --recipe karimzadeh_ecclip_2026 \
+  --genome hg38 \
+  --run-name rbp_ecclip
+```
+
 Switch among initialized runs with:
 
 ```bash
@@ -219,6 +242,8 @@ The run file owns settings that define biological intent or pipeline shape:
 - RNA counting feature, attribute, strandedness, and paired-read semantics
 - transcriptome BAM and transcript quantification outputs
 - per-rule threads, memory, and runtime requests
+- the FASTQ input stage, inline-barcode policy, UMI layout, IP/input links,
+  and CLIP read-end/strand semantics
 
 Tool files own advanced command behavior:
 
@@ -258,6 +283,106 @@ Prefer documented `params` entries when available. `extra` is deliberately an
 escape hatch: SnakeVerse appends it verbatim and cannot validate the flags.
 RSEM, STAR, Bowtie2, BWA-MEM2, samtools, and SRA Toolkit profiles label their
 command stages explicitly where needed.
+
+Module-local `params` and `extra` overlay the selected base tool profile for
+that module. This lets a recipe request, for example, unique-only STAR mapping
+or 10-bp coverage without changing the project-wide STAR or deepTools file.
+
+## eCLIP and ecCLIP
+
+Both CLIP recipes stop at UMI-deduplicated alignments and coverage tracks.
+They intentionally do not perform repeat-element pre-alignment, peak calling,
+IDR, motif analysis, tag-control subtraction, or RBP-binding classification.
+
+### Sample sheet
+
+The eCLIP sheet uses one row per sample and technical unit:
+
+```text
+sample_id  unit_id  fastq_1  fastq_2  condition  replicate  library_type  target  pool_id  input_sample_id  inline_barcodes
+PUM2_IP_1  L001     pool_R1  pool_R2  K562       1          ip            PUM2    pool_1   PUM2_SMI_1       A01=ATTGCTT,B06=ACAAGCC
+PUM2_SMI_1 L001     input_R1 input_R2 K562       1          sm_input      PUM2
+TAG_1      L001     tag_R1   tag_R2   K562       1          tag_control   tag
+```
+
+- `library_type` is `ip`, `sm_input`, or `tag_control`.
+- An IP links directly to its size-matched input with `input_sample_id`.
+  Tag-only controls are processed normally but are never accepted as SMInputs.
+- `inline_barcodes` is a comma-separated `Name=SEQUENCE` list. Multiple names
+  on one row are merged into that sample unit.
+- Rows sharing a physical pool repeat the same FASTQ paths and `pool_id`.
+  SnakeVerse validates those paths and runs Cutadapt once for the pool.
+- Biological replicates retain distinct `sample_id` values. Technical units
+  sharing a sample ID are merged only at alignment.
+
+### Starting stage and UMI layout
+
+Declare one starting stage for the run:
+
+```yaml
+preprocessing:
+  input_stage: raw  # raw | demultiplexed | umi_extracted
+```
+
+`demultiplexed` bypasses inline-barcode processing. `umi_extracted` also
+bypasses UMI-tools extraction and assumes the UMI is already in the read name.
+The default QNAME form is UMI-tools' final `_<UMI>` suffix; set
+`modules.umi_deduplication.qname_regex` with a named `(?P<umi>...)` group for
+another convention.
+
+Friendly UMI definitions are run-level and reusable:
+
+```yaml
+modules:
+  umi_extraction:
+    enabled: true
+    method: string                 # or regex
+    read1: {role: biological}
+    read2:
+      pattern: NNNNNNNN
+      location: 5prime
+      role: umi_only
+```
+
+An `umi_only` R2 contributes its UMI but is omitted from alignment, converting
+raw paired ecCLIP input into single-end R1 alignment. Conventional eCLIP uses a
+5-nt R2 UMI with `role: biological`, so both mates remain aligned.
+
+The supplied ecCLIP recipe follows the paper's R1 clipping, poly(A) trimming,
+quality, and minimum-length policy, but deliberately uses SnakeVerse's existing
+STAR alignment path rather than BWA-aln. Both supplied recipes retain unique
+primary alignments.
+
+### CLIP outputs
+
+For each library, the recipes retain:
+
+```text
+bam/raw/<sample>.bam
+bam/pre_dedup/<sample>.bam          RX-tagged, before UMI deduplication
+bam/umi_dedup/<sample>.bam
+tracks/read_coverage/<sample>.<plus|minus>.bw
+tracks/crosslink_sites/<sample>.<plus|minus>.bw
+```
+
+Processing reports remain under `qc/`: per-pool Cutadapt demultiplexing JSON,
+UMI-tools family/edit-distance tables, and samtools flagstat/idxstats before and
+after deduplication. Cutadapt and UMI-tools text logs remain under `logs/`, and
+MultiQC scans the complete run directory so these basic processing metrics are
+collected where supported.
+
+UMI-tools groups by strand as part of its coordinate semantics; consequently
+`modules.umi_deduplication.strand_aware` must remain `true`. Splice-aware
+grouping is enabled by default and can be changed with `spliced_is_unique`.
+
+Read coverage defaults to 10-bp CPM. Crosslink tracks are unsmoothed 1-bp raw
+counts: conventional eCLIP uses the reverse-interpreted mapped 5' end of R2,
+while ecCLIP uses the mapped 5' end of R1 on its alignment strand.
+
+An IP with a valid SMInput link additionally receives 50-bp, library-size
+scaled log2 enrichment tracks under `tracks/enrichment/`. The default symmetric
+pseudocount is 1, and bins where both inputs are zero are omitted. An IP without
+an SMInput is valid and produces a warning; enrichment is simply skipped.
 
 ## Adapter Trimming
 
@@ -451,9 +576,9 @@ remote source.
 5. Add a rule-level Conda environment when introducing a new tool.
 6. Add validation for new contextual requirements and CI fixtures for the path.
 
-Execution profiles remain external. Future eCLIP, Ribo-seq, ChIP-seq/CUT&Tag,
+Execution profiles remain external. Future Ribo-seq, ChIP-seq/CUT&Tag,
 PRO-seq, and SLAM-seq support should follow the same recipe-to-complete-run
-pattern.
+pattern used by the current assays.
 
 ## Current Limitations
 

@@ -59,6 +59,8 @@ def render_cutadapt(params: Mapping[str, Any]) -> str:
         "adapter_r2": "-A",
         "front_r1": "-g",
         "front_r2": "-G",
+        "cut_r1": "-u",
+        "cut_r2": "-U",
         "quality_cutoff": "-q",
         "minimum_length": "-m",
         "error_rate": "-e",
@@ -68,7 +70,13 @@ def render_cutadapt(params: Mapping[str, Any]) -> str:
     parts: list[str] = []
     for key, value in params.items():
         flag = flag_map.get(key, f"--{_dash(key)}")
-        _append_flag(parts, flag, value)
+        if key in {"adapter_r1", "adapter_r2", "front_r1", "front_r2"} and isinstance(
+            value, (list, tuple)
+        ):
+            for item in value:
+                _append_flag(parts, flag, item)
+        else:
+            _append_flag(parts, flag, value)
     return " ".join(parts)
 
 
@@ -159,9 +167,17 @@ def render_star_alignment(config: Mapping[str, Any], transcriptome_bam: bool) ->
             for key, value in profile_params.items()
             if key not in {"align", "index"}
         }
+    module_params = (config.get("modules", {}) or {}).get("alignment", {}).get(
+        "params", {}
+    ) or {}
+    if isinstance(module_params.get("align"), Mapping):
+        module_params = module_params.get("align", {}) or {}
+    params.update(module_params)
     if not transcriptome_bam and "quantMode" in params:
         modes = str(params["quantMode"]).split()
-        params["quantMode"] = " ".join(mode for mode in modes if mode != "TranscriptomeSAM")
+        params["quantMode"] = " ".join(
+            mode for mode in modes if mode != "TranscriptomeSAM"
+        )
     return render_star(params)
 
 
@@ -218,7 +234,9 @@ def render_featurecounts_for_config(
     overrides: Mapping[str, Any] | None = None,
     drop_keys: tuple[str, ...] = (),
 ) -> str:
-    params = dict(config.get("tools", {}).get("featurecounts", {}).get("params", {}) or {})
+    params = dict(
+        config.get("tools", {}).get("featurecounts", {}).get("params", {}) or {}
+    )
     module = config.get("modules", {}).get("gene_counts", {}) or {}
     for key in (
         "feature_type",
@@ -359,11 +377,25 @@ def tool_extra(config: Mapping[str, Any], tool: str, section: str | None = None)
     return str(extra or "")
 
 
+def module_tool_extra(
+    config: Mapping[str, Any], module: str, tool: str, section: str | None = None
+) -> str:
+    """Combine base tool extras with optional module-local extras."""
+    base = tool_extra(config, tool, section)
+    module_extra: Any = ((config.get("modules", {}) or {}).get(module, {}) or {}).get(
+        "extra", ""
+    )
+    if isinstance(module_extra, Mapping):
+        module_extra = module_extra.get(section or "default", "")
+    return " ".join(part for part in (base, str(module_extra or "")) if part)
+
+
 def render_tool_params(
     config: Mapping[str, Any],
     tool: str,
     section: str | None = None,
     overrides: Mapping[str, Any] | None = None,
+    module: str | None = None,
 ) -> str:
     profile = tool_profile(config, tool)
     params: Mapping[str, Any] = profile.get("params", {}) or {}
@@ -379,8 +411,17 @@ def render_tool_params(
         else:
             params = {}
     merged = dict(params)
+    if module:
+        module_params: Mapping[str, Any] = (
+            (config.get("modules", {}) or {}).get(module, {}) or {}
+        ).get("params", {}) or {}
+        if section and isinstance(module_params.get(section), Mapping):
+            module_params = module_params.get(section, {}) or {}
+        merged.update(module_params)
     if overrides:
-        merged.update({key: value for key, value in overrides.items() if value is not None})
+        merged.update(
+            {key: value for key, value in overrides.items() if value is not None}
+        )
     if tool == "samtools" and section == "filter":
         return render_samtools_view(merged)
     if tool == "samtools" and section == "sort":
@@ -389,5 +430,7 @@ def render_tool_params(
     return renderer(merged)
 
 
-def resource_value(config: Mapping[str, Any], rule_name: str, key: str, default: Any) -> Any:
+def resource_value(
+    config: Mapping[str, Any], rule_name: str, key: str, default: Any
+) -> Any:
     return config.get("resources", {}).get(rule_name, {}).get(key, default)

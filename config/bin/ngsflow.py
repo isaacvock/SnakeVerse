@@ -158,7 +158,9 @@ def resolve_config(configfile: str | Path) -> dict[str, Any]:
     pointer = load_yaml(pointer_path)
     run_value = pointer.get("run_config")
     if not run_value:
-        raise ValueError(f"{display_path(pointer_path, project_root)} must define run_config")
+        raise ValueError(
+            f"{display_path(pointer_path, project_root)} must define run_config"
+        )
     run_path = project_path(str(run_value), project_root)
     run = load_yaml(run_path)
     if run.get("schema_version") != 2:
@@ -168,12 +170,16 @@ def resolve_config(configfile: str | Path) -> dict[str, Any]:
 
     reference_value = run.get("reference")
     if not reference_value:
-        raise ValueError(f"Run config must define reference: {display_path(run_path, project_root)}")
+        raise ValueError(
+            f"Run config must define reference: {display_path(run_path, project_root)}"
+        )
     reference_path = project_path(str(reference_value), project_root)
     reference_document = load_yaml(reference_path)
     reference = reference_document.get("reference")
     if not isinstance(reference, dict):
-        raise ValueError(f"Reference file must contain a top-level reference mapping: {reference_path}")
+        raise ValueError(
+            f"Reference file must contain a top-level reference mapping: {reference_path}"
+        )
 
     config_root = pointer_path.parent
     tools: dict[str, dict[str, Any]] = {}
@@ -217,9 +223,22 @@ def required_tools(config: dict[str, Any], rows: list[dict[str, str]]) -> list[s
     for name in ("trimming", "alignment", "gene_counts", "peak_calling"):
         if module_enabled(config, name):
             tools.append(str(module(config, name).get("tool") or ""))
-    if any(module_enabled(config, name) for name in ("alignment", "mark_duplicates", "bam_filter", "bam_qc")):
+    stage = str((config.get("preprocessing", {}) or {}).get("input_stage", "raw"))
+    if module_enabled(config, "inline_barcode_demultiplexing") and stage == "raw":
+        tools.append("cutadapt")
+    if module_enabled(config, "umi_extraction") and stage != "umi_extracted":
+        tools.append("umi_tools")
+    if module_enabled(config, "umi_deduplication"):
+        tools.extend(["umi_tools", "samtools"])
+    if any(
+        module_enabled(config, name)
+        for name in ("alignment", "mark_duplicates", "bam_filter", "bam_qc")
+    ):
         tools.append("samtools")
-    if module_enabled(config, "coverage"):
+    if any(
+        module_enabled(config, name)
+        for name in ("coverage", "crosslink_sites", "enrichment")
+    ):
         tools.append("deeptools")
     if module_enabled(config, "multiqc"):
         tools.append("multiqc")
@@ -250,7 +269,9 @@ def load_samples(config: dict[str, Any]) -> tuple[list[dict[str, str]], list[str
 
 
 def index_is_ready(config: dict[str, Any], aligner: str) -> bool:
-    index_value = str((config.get("reference", {}).get("indexes", {}) or {}).get(aligner) or "").rstrip("/")
+    index_value = str(
+        (config.get("reference", {}).get("indexes", {}) or {}).get(aligner) or ""
+    ).rstrip("/")
     if not index_value:
         return False
     root = Path(config["_ngsflow"]["project_root"])
@@ -272,7 +293,14 @@ def validate_config(config: dict[str, Any]) -> tuple[list[str], list[str]]:
     assay = str(config.get("assay") or "")
     required_columns = {
         "generic": ["sample_id", "unit_id", "fastq_1"],
-        "rnaseq": ["sample_id", "unit_id", "fastq_1", "condition", "replicate", "strandedness"],
+        "rnaseq": [
+            "sample_id",
+            "unit_id",
+            "fastq_1",
+            "condition",
+            "replicate",
+            "strandedness",
+        ],
         "atacseq": ["sample_id", "unit_id", "fastq_1", "condition", "replicate"],
     }.get(assay, [])
     if not required_columns:
@@ -287,10 +315,13 @@ def validate_config(config: dict[str, Any]) -> tuple[list[str], list[str]]:
         errors.append("Samples file contains a duplicate sample_id/unit_id combination")
 
     active_tools = config.get("tools", {}) or {}
-    missing_tools = [name for name in required_tools(config, rows) if name not in active_tools]
+    missing_tools = [
+        name for name in required_tools(config, rows) if name not in active_tools
+    ]
     if missing_tools:
         errors.append(
-            "Missing tool configurations: " + ", ".join(missing_tools)
+            "Missing tool configurations: "
+            + ", ".join(missing_tools)
             + ". Add each with: python config/bin/ngsflow.py add-tool <tool>"
         )
 
@@ -298,8 +329,12 @@ def validate_config(config: dict[str, Any]) -> tuple[list[str], list[str]]:
     aligner = str(alignment.get("tool") or "")
     if not module_enabled(config, "alignment") or aligner not in INDEX_FILES:
         errors.append("modules.alignment must select star, bowtie2, or bwa_mem2")
-    elif not index_is_ready(config, aligner) and not config.get("reference", {}).get("fasta"):
-        errors.append(f"reference.fasta is required because the {aligner} index must be built")
+    elif not index_is_ready(config, aligner) and not config.get("reference", {}).get(
+        "fasta"
+    ):
+        errors.append(
+            f"reference.fasta is required because the {aligner} index must be built"
+        )
 
     trimming = module(config, "trimming")
     if module_enabled(config, "trimming"):
@@ -309,14 +344,22 @@ def validate_config(config: dict[str, Any]) -> tuple[list[str], list[str]]:
         if tool not in {"fastp", "cutadapt"}:
             errors.append("modules.trimming.tool must be fastp or cutadapt")
         if mode not in {"auto", "sequences", "none"}:
-            errors.append("modules.trimming.adapters.mode must be auto, sequences, or none")
+            errors.append(
+                "modules.trimming.adapters.mode must be auto, sequences, or none"
+            )
         if mode == "auto" and tool != "fastp":
             errors.append("Adapter auto-detection is available only with fastp")
         if mode == "sequences" and not adapters.get("read1"):
-            errors.append("Adapter mode sequences requires modules.trimming.adapters.read1")
-        paired = any(row.get("fastq_2") or row.get("sra_layout") == "paired" for row in rows)
+            errors.append(
+                "Adapter mode sequences requires modules.trimming.adapters.read1"
+            )
+        paired = any(
+            row.get("fastq_2") or row.get("sra_layout") == "paired" for row in rows
+        )
         if mode == "sequences" and paired and not adapters.get("read2"):
-            errors.append("Paired-end adapter mode sequences requires modules.trimming.adapters.read2")
+            errors.append(
+                "Paired-end adapter mode sequences requires modules.trimming.adapters.read2"
+            )
         if mode == "none":
             warnings.append("Trimming is enabled without adapter removal")
         conflicts = sorted(
@@ -331,12 +374,18 @@ def validate_config(config: dict[str, Any]) -> tuple[list[str], list[str]]:
             )
 
     reference = config.get("reference", {}) or {}
-    if assay == "rnaseq" and module_enabled(config, "gene_counts") and not reference.get("gtf"):
+    if (
+        assay == "rnaseq"
+        and module_enabled(config, "gene_counts")
+        and not reference.get("gtf")
+    ):
         errors.append("reference.gtf is required by modules.gene_counts")
     if assay == "rnaseq" and module_enabled(config, "gene_counts"):
         modes = module(config, "gene_counts").get("modes", {}) or {}
         if not any(bool(value) for value in modes.values()):
-            errors.append("modules.gene_counts is enabled but no counting mode is enabled")
+            errors.append(
+                "modules.gene_counts is enabled but no counting mode is enabled"
+            )
         conflicts = sorted(
             FEATURECOUNTS_RUN_KEYS.intersection(
                 (active_tools.get("featurecounts", {}).get("params", {}) or {}).keys()
@@ -348,15 +397,23 @@ def validate_config(config: dict[str, Any]) -> tuple[list[str], list[str]]:
                 "config/tools/featurecounts.yaml: " + ", ".join(conflicts)
             )
         layouts = {
-            "paired" if row.get("fastq_2") or row.get("sra_layout") == "paired" else "single"
+            (
+                "paired"
+                if row.get("fastq_2") or row.get("sra_layout") == "paired"
+                else "single"
+            )
             for row in rows
         }
         if len(layouts) > 1:
-            errors.append("featureCounts requires one read layout per run; samples mix paired and single")
+            errors.append(
+                "featureCounts requires one read layout per run; samples mix paired and single"
+            )
         if module(config, "gene_counts").get("strandedness", "sample") == "sample":
             strand_values = {row.get("strandedness") for row in rows}
             if len(strand_values) > 1:
-                errors.append("featureCounts requires one strandedness per run; sample values differ")
+                errors.append(
+                    "featureCounts requires one strandedness per run; sample values differ"
+                )
     for name in ("salmon_quantification", "rsem_quantification"):
         settings = module(config, name)
         if module_enabled(config, name) and not (
@@ -364,15 +421,24 @@ def validate_config(config: dict[str, Any]) -> tuple[list[str], list[str]]:
         ):
             errors.append(f"modules.{name} is enabled but requests no result type")
     if module_enabled(config, "rsem_quantification"):
-        rsem_quant = (active_tools.get("rsem", {}).get("params", {}) or {}).get("quant", {}) or {}
+        rsem_quant = (active_tools.get("rsem", {}).get("params", {}) or {}).get(
+            "quant", {}
+        ) or {}
         conflicts = sorted(RSEM_RUN_KEYS.intersection(rsem_quant))
         if conflicts:
             errors.append(
                 "RSEM layout, strandedness, and execution inputs are inferred by the workflow; "
-                "remove from config/tools/rsem.yaml params.quant: " + ", ".join(conflicts)
+                "remove from config/tools/rsem.yaml params.quant: "
+                + ", ".join(conflicts)
             )
-    if assay == "atacseq" and module_enabled(config, "bam_filter") and not reference.get("blacklist"):
-        warnings.append("ATAC-seq blacklist filtering is recommended; reference.blacklist is blank")
+    if (
+        assay == "atacseq"
+        and module_enabled(config, "bam_filter")
+        and not reference.get("blacklist")
+    ):
+        warnings.append(
+            "ATAC-seq blacklist filtering is recommended; reference.blacklist is blank"
+        )
     if module_enabled(config, "tss_enrichment"):
         for key in ("tss_bed", "chrom_sizes"):
             if not reference.get(key):
@@ -382,13 +448,21 @@ def validate_config(config: dict[str, Any]) -> tuple[list[str], list[str]]:
     for key in ("fasta", "gtf", "chrom_sizes", "blacklist", "tss_bed"):
         value = reference.get(key)
         if value and not project_path(str(value), project_root).exists():
-            warnings.append(f"Reference path does not exist yet: reference.{key} = {value}")
+            warnings.append(
+                f"Reference path does not exist yet: reference.{key} = {value}"
+            )
     for row in rows:
         sample = row.get("sample_id") or "<unknown>"
         if not row.get("fastq_1") and not row.get("sra_id"):
             errors.append(f"Sample {sample} needs fastq_1 or sra_id")
-        if assay == "rnaseq" and row.get("strandedness") not in {"unstranded", "forward", "reverse"}:
-            errors.append(f"Sample {sample} has invalid strandedness: {row.get('strandedness')}")
+        if assay == "rnaseq" and row.get("strandedness") not in {
+            "unstranded",
+            "forward",
+            "reverse",
+        }:
+            errors.append(
+                f"Sample {sample} has invalid strandedness: {row.get('strandedness')}"
+            )
         for key in ("fastq_1", "fastq_2"):
             value = row.get(key)
             if value and not project_path(value, project_root).exists():
@@ -418,8 +492,16 @@ def command_init_run(args: argparse.Namespace) -> None:
         "RECIPE": args.recipe,
     }
     jobs: list[tuple[Path, Path, bool]] = [
-        (catalog_root / recipe["run_template"], config_root / "runs" / f"{args.run_name}.yaml", False),
-        (catalog_root / recipe["sample_template"], config_root / "samples" / f"{args.run_name}.tsv", False),
+        (
+            catalog_root / recipe["run_template"],
+            config_root / "runs" / f"{args.run_name}.yaml",
+            False,
+        ),
+        (
+            catalog_root / recipe["sample_template"],
+            config_root / "samples" / f"{args.run_name}.tsv",
+            False,
+        ),
         (
             catalog_root / "references" / f"{args.genome}.yaml",
             config_root / "references" / f"{args.genome}.yaml",
@@ -436,7 +518,9 @@ def command_init_run(args: argparse.Namespace) -> None:
     )
     missing_sources = [source for source, _, _ in jobs if not source.exists()]
     if missing_sources:
-        raise FileNotFoundError("Catalog files are missing: " + ", ".join(map(str, missing_sources)))
+        raise FileNotFoundError(
+            "Catalog files are missing: " + ", ".join(map(str, missing_sources))
+        )
     conflicts = [
         destination
         for _, destination, shared in jobs
@@ -461,12 +545,25 @@ def command_init_run(args: argparse.Namespace) -> None:
     pointer = write_active_pointer(config_root, args.run_name)
     print(f"activate {display_path(pointer, project_root)}")
     print("\nEdit these files in order:")
-    print(f"  1. config/samples/{args.run_name}.tsv - replace example samples and FASTQ paths")
-    print(f"  2. config/references/{args.genome}.yaml - set FASTA, annotation, and any ready index")
-    print(f"  3. config/runs/{args.run_name}.yaml - review adapters, modules, and resources")
-    alignment_tool = load_yaml(config_root / "runs" / f"{args.run_name}.yaml").get("modules", {}).get("alignment", {}).get("tool")
+    print(
+        f"  1. config/samples/{args.run_name}.tsv - replace example samples and FASTQ paths"
+    )
+    print(
+        f"  2. config/references/{args.genome}.yaml - set FASTA, annotation, and any ready index"
+    )
+    print(
+        f"  3. config/runs/{args.run_name}.yaml - review adapters, modules, and resources"
+    )
+    alignment_tool = (
+        load_yaml(config_root / "runs" / f"{args.run_name}.yaml")
+        .get("modules", {})
+        .get("alignment", {})
+        .get("tool")
+    )
     print(f"  4. config/tools/{alignment_tool}.yaml - review alignment policy")
-    print("  5. Other files in config/tools/ - adjust advanced tool behavior only when needed")
+    print(
+        "  5. Other files in config/tools/ - adjust advanced tool behavior only when needed"
+    )
     print("\nThen run:")
     print("  python config/bin/ngsflow.py explain")
     print("  python config/bin/ngsflow.py validate")
@@ -477,37 +574,55 @@ def command_add_tool(args: argparse.Namespace) -> None:
     project_root, config_root, catalog_root = script_paths()
     source = catalog_root / "tools" / f"{args.tool}.yaml"
     if not source.exists():
-        available = ", ".join(path.stem for path in sorted((catalog_root / "tools").glob("*.yaml")))
+        available = ", ".join(
+            path.stem for path in sorted((catalog_root / "tools").glob("*.yaml"))
+        )
         raise ValueError(f"Unknown catalog tool '{args.tool}'. Available: {available}")
     destination = config_root / "tools" / source.name
     print(materialize(source, destination, {}, args.overwrite, args.skip_existing))
-    print(f"Review {display_path(destination, project_root)} before running the workflow.")
+    print(
+        f"Review {display_path(destination, project_root)} before running the workflow."
+    )
 
 
 def command_activate_run(args: argparse.Namespace) -> None:
     project_root, config_root, _ = script_paths()
     run_path = config_root / "runs" / f"{args.run_name}.yaml"
     if not run_path.exists():
-        raise FileNotFoundError(f"Run config does not exist: {display_path(run_path, project_root)}")
+        raise FileNotFoundError(
+            f"Run config does not exist: {display_path(run_path, project_root)}"
+        )
     pointer = write_active_pointer(config_root, args.run_name)
-    print(f"Activated {display_path(run_path, project_root)} via {display_path(pointer, project_root)}")
+    print(
+        f"Activated {display_path(run_path, project_root)} via {display_path(pointer, project_root)}"
+    )
 
 
 def print_default_explanation(config: dict[str, Any]) -> None:
     meta = config["_ngsflow"]
     project = config.get("project", {}) or {}
-    print(f"Run: {project.get('run_name', '<unnamed>')} ({config.get('assay', '<unset>')})")
+    print(
+        f"Run: {project.get('run_name', '<unnamed>')} ({config.get('assay', '<unset>')})"
+    )
     recipe = (config.get("created_from") or {}).get("recipe")
     if recipe:
-        print(f"Created from recipe: {recipe} (provenance only; it does not affect runtime)")
+        print(
+            f"Created from recipe: {recipe} (provenance only; it does not affect runtime)"
+        )
     print("\nFiles that control this run:")
     print(f"  run        {meta['run_config']}")
     print(f"  samples    {config.get('samples')}")
     print(f"  reference  {meta['reference_file']}")
     print("\nPipeline:")
     for name, settings in (config.get("modules") or {}).items():
-        state = "ON " if isinstance(settings, dict) and settings.get("enabled") else "off"
-        tool = f" [{settings.get('tool')}]" if isinstance(settings, dict) and settings.get("tool") else ""
+        state = (
+            "ON " if isinstance(settings, dict) and settings.get("enabled") else "off"
+        )
+        tool = (
+            f" [{settings.get('tool')}]"
+            if isinstance(settings, dict) and settings.get("tool")
+            else ""
+        )
         print(f"  {state:3} {name}{tool}")
     rows, _ = load_samples(config)
     used_tools = required_tools(config, rows)
@@ -523,10 +638,16 @@ def print_default_explanation(config: dict[str, Any]) -> None:
     trimming = module(config, "trimming")
     alignment = module(config, "alignment")
     print("\nReview first:")
-    print(f"  adapters   mode={(trimming.get('adapters') or {}).get('mode', '<unset>')} (run file)")
-    print(f"  alignment  {alignment.get('tool', '<unset>')} (run file + matching tool file)")
+    print(
+        f"  adapters   mode={(trimming.get('adapters') or {}).get('mode', '<unset>')} (run file)"
+    )
+    print(
+        f"  alignment  {alignment.get('tool', '<unset>')} (run file + matching tool file)"
+    )
     print("  reference  required fields depend on the enabled modules")
-    print("\nMore detail: ngsflow.py explain trimming | alignment | reference | tool <name>")
+    print(
+        "\nMore detail: ngsflow.py explain trimming | alignment | reference | tool <name>"
+    )
 
 
 def command_explain(args: argparse.Namespace) -> None:
@@ -541,37 +662,81 @@ def command_explain(args: argparse.Namespace) -> None:
         print(f"  enabled: {settings.get('enabled', False)}")
         print(f"  tool: {settings.get('tool', '<unset>')}")
         print(f"  adapters: {settings.get('adapters', {})}")
-        print("Use mode auto with fastp, sequences for explicit adapters, or none for quality-only trimming.")
+        print(
+            "Use mode auto with fastp, sequences for explicit adapters, or none for quality-only trimming."
+        )
     elif topic[0] == "alignment":
         settings = module(config, "alignment")
         tool = str(settings.get("tool") or "")
-        print("The run file selects the aligner; its available tool file controls advanced CLI behavior.")
+        print(
+            "The run file selects the aligner; its available tool file controls advanced CLI behavior."
+        )
         print(f"  selection: {settings}")
-        print(f"  tool file: {config['_ngsflow'].get('tool_files', {}).get(tool, '<missing>')}")
-        print(f"  index: {(config.get('reference', {}).get('indexes', {}) or {}).get(tool) or '<build from FASTA>'}")
+        print(
+            f"  tool file: {config['_ngsflow'].get('tool_files', {}).get(tool, '<missing>')}"
+        )
+        print(
+            f"  index: {(config.get('reference', {}).get('indexes', {}) or {}).get(tool) or '<build from FASTA>'}"
+        )
+    elif topic[0] == "preprocessing":
+        print(
+            "FASTQ preprocessing is configured by preprocessing.input_stage and reusable modules."
+        )
+        print(
+            f"  input_stage: {(config.get('preprocessing', {}) or {}).get('input_stage', 'raw')}"
+        )
+        for name in ("inline_barcode_demultiplexing", "umi_extraction", "trimming"):
+            print(f"  {name}: {module(config, name)}")
     elif topic[0] == "reference":
         print(f"Reference file: {config['_ngsflow']['reference_file']}")
-        print("Blank optional fields are valid; requirements are derived from enabled modules.")
+        print(
+            "Blank optional fields are valid; requirements are derived from enabled modules."
+        )
         for key, value in config.get("reference", {}).items():
             print(f"  {key}: {value if value not in (None, '') else '<blank>'}")
     elif topic[0] == "tool" and len(topic) == 2:
         name = topic[1]
         if name not in config.get("tools", {}):
-            raise ValueError(f"Tool '{name}' is not available. Add it with: ngsflow.py add-tool {name}")
+            raise ValueError(
+                f"Tool '{name}' is not available. Add it with: ngsflow.py add-tool {name}"
+            )
         tool_label = config["_ngsflow"]["tool_files"][name]
         tool_path = project_path(tool_label, Path(config["_ngsflow"]["project_root"]))
         print(f"Tool file: {tool_label}")
-        print("Values under params are rendered as CLI options; false, null, and blank values are omitted.")
-        print("Values under extra are appended verbatim. Read the file comments for ownership and syntax.")
+        print(
+            "Values under params are rendered as CLI options; false, null, and blank values are omitted."
+        )
+        print(
+            "Values under extra are appended verbatim. Read the file comments for ownership and syntax."
+        )
         print()
         print(tool_path.read_text(encoding="utf-8").rstrip())
     else:
-        raise ValueError("Explain topics: trimming, alignment, reference, or tool <name>")
+        raise ValueError(
+            "Explain topics: preprocessing, trimming, alignment, reference, or tool <name>"
+        )
+
+
+def validate_with_workflow(config: dict[str, Any]) -> tuple[list[str], list[str]]:
+    """Use the workflow's authoritative sample and contextual validation logic."""
+    project_root, _, _ = script_paths()
+    lib_dir = project_root / "workflow" / "lib"
+    if str(lib_dir) not in sys.path:
+        sys.path.insert(0, str(lib_dir))
+    from samples import load_samples as load_workflow_samples
+    from validation import validate_resolved_config
+
+    samples = load_workflow_samples(
+        str(config.get("samples") or ""),
+        str(config.get("assay") or ""),
+        config.get("_ngsflow", {}).get("project_root"),
+    )
+    return validate_resolved_config(config, samples)
 
 
 def command_validate(args: argparse.Namespace) -> None:
     config = resolve_config(args.configfile)
-    errors, warnings = validate_config(config)
+    errors, warnings = validate_with_workflow(config)
     for warning in warnings:
         print(f"WARNING: {warning}")
     if errors:
@@ -584,7 +749,9 @@ def command_validate(args: argparse.Namespace) -> None:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Materialize and inspect SnakeVerse configuration.")
+    parser = argparse.ArgumentParser(
+        description="Materialize and inspect SnakeVerse configuration."
+    )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     list_parser = subparsers.add_parser("list", help="List catalog assays or recipes.")
@@ -592,7 +759,9 @@ def build_parser() -> argparse.ArgumentParser:
     list_parser.add_argument("--assay", help="Assay name when listing recipes.")
     list_parser.set_defaults(func=command_list)
 
-    init_parser = subparsers.add_parser("init-run", help="Create one complete editable run.")
+    init_parser = subparsers.add_parser(
+        "init-run", help="Create one complete editable run."
+    )
     init_parser.add_argument("--assay", required=True)
     init_parser.add_argument("--recipe", required=True)
     init_parser.add_argument("--genome", required=True)
@@ -602,18 +771,24 @@ def build_parser() -> argparse.ArgumentParser:
     init_mode.add_argument("--skip-existing", action="store_true")
     init_parser.set_defaults(func=command_init_run)
 
-    tool_parser = subparsers.add_parser("add-tool", help="Copy one advanced tool config from the catalog.")
+    tool_parser = subparsers.add_parser(
+        "add-tool", help="Copy one advanced tool config from the catalog."
+    )
     tool_parser.add_argument("tool")
     tool_mode = tool_parser.add_mutually_exclusive_group()
     tool_mode.add_argument("--overwrite", action="store_true")
     tool_mode.add_argument("--skip-existing", action="store_true")
     tool_parser.set_defaults(func=command_add_tool)
 
-    activate_parser = subparsers.add_parser("activate-run", help="Point config/config.yaml at a run.")
+    activate_parser = subparsers.add_parser(
+        "activate-run", help="Point config/config.yaml at a run."
+    )
     activate_parser.add_argument("run_name")
     activate_parser.set_defaults(func=command_activate_run)
 
-    explain_parser = subparsers.add_parser("explain", help="Explain the active run or one topic.")
+    explain_parser = subparsers.add_parser(
+        "explain", help="Explain the active run or one topic."
+    )
     explain_parser.add_argument("topic", nargs="*")
     explain_parser.add_argument("--configfile", default="config/config.yaml")
     explain_parser.set_defaults(func=command_explain)

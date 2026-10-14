@@ -1,0 +1,65 @@
+schema_version: 2
+created_from: {recipe: encode_eclip, version: 1}
+project: {name: snakeverse_ci, run_name: eclip_preextracted}
+assay: eclip
+samples: .test/configs/samples/eclip_preextracted.tsv
+reference: .test/configs/references/eclip_test_genome.yaml
+results_dir: .test/results/eclip_preextracted
+preprocessing: {input_stage: umi_extracted}
+
+modules:
+  fastq_qc: {enabled: true}
+  inline_barcode_demultiplexing:
+    enabled: true
+    read: R1
+    end: 5prime
+    max_mismatches: 0
+    allow_indels: false
+  umi_extraction:
+    enabled: true
+    method: string
+    read1: {role: biological}
+    read2: {pattern: NNNNN, location: 5prime, role: biological}
+  trimming:
+    enabled: true
+    tool: cutadapt
+    adapters: {mode: none, read1: null, read2: null}
+    params: {quality_cutoff: "0,0", minimum_length: 20, times: 1}
+  alignment:
+    enabled: true
+    tool: star
+    transcriptome_bam: false
+    params:
+      align: {outFilterMultimapNmax: 1, alignEndsType: EndToEnd, quantMode: ""}
+  mark_duplicates: {enabled: false}
+  bam_filter:
+    enabled: true
+    min_mapq: 255
+    required_flags: 2
+    excluded_flags: 2828
+    keep_duplicates: true
+    exclude_contigs: []
+  umi_deduplication:
+    enabled: true
+    method: directional
+    edit_distance: 1
+    strand_aware: true
+    spliced_is_unique: true
+    umi_tag: RX
+    qname_regex: '[|]UMI=(?P<umi>[ACGTN]+)$'
+  bam_qc: {enabled: true}
+  coverage: {enabled: false}
+  crosslink_sites: {enabled: false}
+  enrichment: {enabled: false}
+  multiqc: {enabled: true}
+
+resources:
+  fastqc: {threads: 1, mem_mb: 512, runtime_min: 15}
+  cutadapt: {threads: 1, mem_mb: 512, runtime_min: 15}
+  star: {threads: 2, mem_mb: 2048, runtime_min: 60}
+  star_index: {threads: 2, mem_mb: 2048, runtime_min: 60}
+  samtools_filter: {threads: 1, mem_mb: 512, runtime_min: 15}
+  umi_tools_tag: {threads: 1, mem_mb: 512, runtime_min: 15}
+  umi_tools_dedup: {threads: 1, mem_mb: 1024, runtime_min: 30}
+  samtools_qc: {threads: 1, mem_mb: 512, runtime_min: 15}
+  multiqc: {threads: 1, mem_mb: 512, runtime_min: 15}

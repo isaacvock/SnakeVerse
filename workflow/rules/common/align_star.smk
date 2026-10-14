@@ -1,4 +1,4 @@
-from params import render_star_alignment, resource_value, tool_extra
+from params import module_tool_extra, render_star_alignment, resource_value
 from refs import aligner_index_inputs, aligner_index_prefix
 from samples import star_reads_arg
 
@@ -27,7 +27,7 @@ if needs_transcriptome_bam():
             reads=lambda wildcards, input: star_reads_arg(input.r1, input.r2),
             prefix=lambda wildcards: f"{RESULTS_DIR}/star/{wildcards.sample}/",
             star_args=lambda wildcards: render_star_alignment(config, True),
-            extra=lambda wildcards: tool_extra(config, "star", section="align")
+            extra=lambda wildcards: module_tool_extra(config, "alignment", "star", section="align")
         shell:
             """
             set -euo pipefail
@@ -64,7 +64,7 @@ else:
             reads=lambda wildcards, input: star_reads_arg(input.r1, input.r2),
             prefix=lambda wildcards: f"{RESULTS_DIR}/star/{wildcards.sample}/",
             star_args=lambda wildcards: render_star_alignment(config, False),
-            extra=lambda wildcards: tool_extra(config, "star", section="align")
+            extra=lambda wildcards: module_tool_extra(config, "alignment", "star", section="align")
         shell:
             """
             set -euo pipefail

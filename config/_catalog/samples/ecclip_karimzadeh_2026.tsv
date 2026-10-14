@@ -1,0 +1,4 @@
+sample_id	unit_id	fastq_1	fastq_2	condition	replicate	library_type	target	pool_id	input_sample_id	inline_barcodes	sra_id	sra_layout
+RBP_IP_rep1	L001	fastq/RBP_IP_rep1_R1.fastq.gz	fastq/RBP_IP_rep1_R2.fastq.gz	cell_type	1	ip	RBP					
+TAG_control_rep1	L001	fastq/TAG_control_rep1_R1.fastq.gz	fastq/TAG_control_rep1_R2.fastq.gz	cell_type	1	tag_control	tag					
+# R2 is an 8-nt UMI-only read and is not aligned. A tag control is not an SMInput.

@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import csv
 import io
+import re
 from collections import defaultdict
 from pathlib import Path
 from typing import Any
-
 
 GENERIC_REQUIRED_COLUMNS = ["sample_id", "unit_id", "fastq_1"]
 RNASEQ_REQUIRED_COLUMNS = [
@@ -23,6 +23,15 @@ ATACSEQ_REQUIRED_COLUMNS = [
     "condition",
     "replicate",
 ]
+ECLIP_REQUIRED_COLUMNS = [
+    "sample_id",
+    "unit_id",
+    "fastq_1",
+    "condition",
+    "replicate",
+    "library_type",
+    "target",
+]
 
 
 def required_columns_for_assay(assay: str) -> list[str]:
@@ -30,6 +39,8 @@ def required_columns_for_assay(assay: str) -> list[str]:
         return RNASEQ_REQUIRED_COLUMNS
     if assay == "atacseq":
         return ATACSEQ_REQUIRED_COLUMNS
+    if assay == "eclip":
+        return ECLIP_REQUIRED_COLUMNS
     return GENERIC_REQUIRED_COLUMNS
 
 
@@ -52,7 +63,9 @@ def load_samples(
         text = "".join(line for line in handle if not line.lstrip().startswith("#"))
         reader = csv.DictReader(io.StringIO(text), delimiter="\t")
         fieldnames = reader.fieldnames or []
-        missing = [col for col in required_columns_for_assay(assay) if col not in fieldnames]
+        missing = [
+            col for col in required_columns_for_assay(assay) if col not in fieldnames
+        ]
         if missing:
             raise ValueError(
                 f"Samples file {sample_path} is missing required columns: "
@@ -67,12 +80,17 @@ def load_samples(
             row.setdefault("fastq_2", "")
             row.setdefault("sra_id", "")
             row.setdefault("sra_layout", "")
+            row.setdefault("pool_id", "")
+            row.setdefault("inline_barcodes", "")
+            row.setdefault("input_sample_id", "")
 
     seen_units: set[str] = set()
     for row in rows:
         unit = unit_key(row)
         if unit in seen_units:
-            raise ValueError(f"Duplicate sample/unit combination in samples file: {unit}")
+            raise ValueError(
+                f"Duplicate sample/unit combination in samples file: {unit}"
+            )
         seen_units.add(unit)
     return rows
 
@@ -121,7 +139,10 @@ def unit_layout(samples: list[dict[str, str]], unit: str) -> str:
 
 
 def sample_layout(samples: list[dict[str, str]], sample: str) -> str:
-    layouts = {"paired" if row_is_paired(row) else "single" for row in units_by_sample(samples)[sample]}
+    layouts = {
+        "paired" if row_is_paired(row) else "single"
+        for row in units_by_sample(samples)[sample]
+    }
     if len(layouts) != 1:
         raise ValueError(f"Sample {sample} mixes paired-end and single-end units")
     return layouts.pop()
@@ -132,6 +153,187 @@ def run_layout(samples: list[dict[str, str]]) -> str:
     if len(layouts) != 1:
         return "mixed"
     return layouts.pop()
+
+
+def input_stage(config: dict[str, Any]) -> str:
+    return str((config.get("preprocessing", {}) or {}).get("input_stage", "raw"))
+
+
+def umi_read_settings(config: dict[str, Any], read: str) -> dict[str, Any]:
+    value = (config.get("modules", {}) or {}).get("umi_extraction", {}) or {}
+    settings = value.get(read.lower(), {}) or {}
+    return settings if isinstance(settings, dict) else {}
+
+
+def processed_unit_layout(
+    config: dict[str, Any], samples: list[dict[str, str]], unit: str
+) -> str:
+    raw_layout = unit_layout(samples, unit)
+    if raw_layout == "single" or input_stage(config) == "umi_extracted":
+        return raw_layout
+    umi = (config.get("modules", {}) or {}).get("umi_extraction", {}) or {}
+    if not umi.get("enabled", False):
+        return raw_layout
+    r1_role = str(umi_read_settings(config, "read1").get("role", "biological"))
+    r2_role = str(umi_read_settings(config, "read2").get("role", "biological"))
+    if r1_role == "umi_only" and r2_role != "umi_only":
+        return "single_r2"
+    if r2_role == "umi_only" and r1_role != "umi_only":
+        return "single"
+    return raw_layout
+
+
+def processed_sample_layout(
+    config: dict[str, Any], samples: list[dict[str, str]], sample: str
+) -> str:
+    layouts = {
+        processed_unit_layout(config, samples, unit_key(row))
+        for row in units_by_sample(samples)[sample]
+    }
+    if len(layouts) != 1:
+        raise ValueError(
+            f"Sample {sample} mixes processed read layouts: {sorted(layouts)}"
+        )
+    layout = layouts.pop()
+    return "single" if layout in {"single", "single_r2"} else layout
+
+
+def parse_inline_barcodes(value: str) -> list[tuple[str, str]]:
+    """Parse a Name=SEQUENCE comma-list without silently accepting ambiguity."""
+    if not value.strip():
+        return []
+    result: list[tuple[str, str]] = []
+    for item in value.split(","):
+        pieces = item.strip().split("=", 1)
+        if len(pieces) != 2 or not all(pieces):
+            raise ValueError(
+                f"Invalid inline barcode '{item}'; expected comma-separated Name=SEQUENCE values"
+            )
+        name, sequence = pieces[0].strip(), pieces[1].strip().upper()
+        if not re.fullmatch(r"[A-Za-z0-9_.-]+", name):
+            raise ValueError(f"Invalid inline barcode name '{name}'")
+        if not re.fullmatch(r"[ACGTRYSWKMBDHVN]+", sequence):
+            raise ValueError(f"Invalid inline barcode sequence for {name}: {sequence}")
+        result.append((name, sequence))
+    if len({name for name, _ in result}) != len(result):
+        raise ValueError("Inline barcode names must be unique within a sample unit")
+    return result
+
+
+def pool_rows(samples: list[dict[str, str]], pool: str) -> list[dict[str, str]]:
+    return [row for row in samples if row.get("pool_id") == pool]
+
+
+def pool_ids(samples: list[dict[str, str]], barcoded_only: bool = False) -> list[str]:
+    values = {
+        row.get("pool_id", "")
+        for row in samples
+        if row.get("pool_id") and (not barcoded_only or row.get("inline_barcodes"))
+    }
+    return sorted(values)
+
+
+def pool_source_row(samples: list[dict[str, str]], pool: str) -> dict[str, str]:
+    rows = pool_rows(samples, pool)
+    if not rows:
+        raise KeyError(f"Unknown FASTQ pool: {pool}")
+    return rows[0]
+
+
+def pool_fastq_for_read(
+    samples: list[dict[str, str]], pool: str, read: str, results_dir: str
+) -> str:
+    return fastq_for_read(
+        samples, unit_key(pool_source_row(samples, pool)), read, results_dir
+    )
+
+
+def demultiplexing_active(config: dict[str, Any]) -> bool:
+    module = (config.get("modules", {}) or {}).get(
+        "inline_barcode_demultiplexing", {}
+    ) or {}
+    return input_stage(config) == "raw" and bool(module.get("enabled", False))
+
+
+def umi_extraction_active(config: dict[str, Any]) -> bool:
+    module = (config.get("modules", {}) or {}).get("umi_extraction", {}) or {}
+    return input_stage(config) != "umi_extracted" and bool(module.get("enabled", False))
+
+
+def demultiplexed_fastq_path(results_dir: str, unit: str, read: str) -> str:
+    return f"{results_dir}/fastq/demultiplexed/{unit}_{read}.fastq.gz"
+
+
+def umi_extracted_fastq_path(results_dir: str, unit: str, read: str) -> str:
+    return f"{results_dir}/fastq/umi_extracted/{unit}_{read}.fastq.gz"
+
+
+def preprocessing_fastq_for_read(
+    config: dict[str, Any],
+    samples: list[dict[str, str]],
+    unit: str,
+    read: str,
+    results_dir: str,
+) -> str:
+    row = sample_by_unit(samples, unit)
+    if demultiplexing_active(config) and parse_inline_barcodes(
+        row.get("inline_barcodes", "")
+    ):
+        return demultiplexed_fastq_path(results_dir, unit, read)
+    return fastq_for_read(samples, unit, read, results_dir)
+
+
+def optional_preprocessing_fastq_for_read(
+    config: dict[str, Any],
+    samples: list[dict[str, str]],
+    unit: str,
+    read: str,
+    results_dir: str,
+) -> list[str]:
+    if read == "R2" and unit_layout(samples, unit) != "paired":
+        return []
+    return [preprocessing_fastq_for_read(config, samples, unit, read, results_dir)]
+
+
+def pre_trimming_fastq_for_read(
+    config: dict[str, Any],
+    samples: list[dict[str, str]],
+    unit: str,
+    read: str,
+    results_dir: str,
+) -> str:
+    if umi_extraction_active(config):
+        return umi_extracted_fastq_path(results_dir, unit, read)
+    return preprocessing_fastq_for_read(config, samples, unit, read, results_dir)
+
+
+def optional_pre_trimming_fastq_for_read(
+    config: dict[str, Any],
+    samples: list[dict[str, str]],
+    unit: str,
+    read: str,
+    results_dir: str,
+) -> list[str]:
+    layout = processed_unit_layout(config, samples, unit)
+    if (read == "R1" and layout == "single_r2") or (
+        read == "R2" and layout == "single"
+    ):
+        return []
+    if read == "R2" and layout not in {"paired", "single_r2"}:
+        return []
+    return [pre_trimming_fastq_for_read(config, samples, unit, read, results_dir)]
+
+
+def fastqc_input_fastq(
+    config: dict[str, Any],
+    samples: list[dict[str, str]],
+    source: str,
+    read: str,
+    results_dir: str,
+) -> str:
+    if demultiplexing_active(config) and source in pool_ids(samples):
+        return pool_fastq_for_read(samples, source, read, results_dir)
+    return fastq_for_read(samples, source, read, results_dir)
 
 
 def fastq_for_read(
@@ -181,12 +383,47 @@ def fastqc_targets(samples: list[dict[str, str]], results_dir: str) -> list[str]
     return targets
 
 
-def trimmed_fastq_targets(samples: list[dict[str, str]], results_dir: str) -> list[str]:
+def input_fastqc_targets(
+    config: dict[str, Any], samples: list[dict[str, str]], results_dir: str
+) -> list[str]:
+    if not demultiplexing_active(config):
+        return fastqc_targets(samples, results_dir)
+    targets: list[str] = []
+    pooled_units = {
+        unit_key(row)
+        for row in samples
+        if row.get("pool_id") and row.get("inline_barcodes")
+    }
+    for pool in pool_ids(samples, barcoded_only=True):
+        row = pool_source_row(samples, pool)
+        targets.append(f"{results_dir}/qc/fastqc/{pool}.R1")
+        if row_is_paired(row):
+            targets.append(f"{results_dir}/qc/fastqc/{pool}.R2")
+    for row in samples:
+        unit = unit_key(row)
+        if unit in pooled_units:
+            continue
+        targets.append(f"{results_dir}/qc/fastqc/{unit}.R1")
+        if row_is_paired(row):
+            targets.append(f"{results_dir}/qc/fastqc/{unit}.R2")
+    return targets
+
+
+def trimmed_fastq_targets(
+    samples: list[dict[str, str]],
+    results_dir: str,
+    config: dict[str, Any] | None = None,
+) -> list[str]:
     targets: list[str] = []
     for row in samples:
         unit = unit_key(row)
         targets.append(f"{results_dir}/fastq/trimmed/{unit}_R1.fastq.gz")
-        if row_is_paired(row):
+        layout = (
+            processed_unit_layout(config, samples, unit)
+            if config
+            else unit_layout(samples, unit)
+        )
+        if layout in {"paired", "single_r2"}:
             targets.append(f"{results_dir}/fastq/trimmed/{unit}_R2.fastq.gz")
     return targets
 
@@ -236,63 +473,195 @@ def bam_qc_targets(samples: list[dict[str, str]], results_dir: str) -> list[str]
 
 
 def bigwig_targets(samples: list[dict[str, str]], results_dir: str) -> list[str]:
-    return [f"{results_dir}/tracks/bigwig/{sample}.bw" for sample in sample_ids(samples)]
+    return [
+        f"{results_dir}/tracks/bigwig/{sample}.bw" for sample in sample_ids(samples)
+    ]
 
 
 def narrowpeak_targets(samples: list[dict[str, str]], results_dir: str) -> list[str]:
-    return [f"{results_dir}/peaks/macs3/{sample}/{sample}_peaks.narrowPeak" for sample in sample_ids(samples)]
+    return [
+        f"{results_dir}/peaks/macs3/{sample}/{sample}_peaks.narrowPeak"
+        for sample in sample_ids(samples)
+    ]
 
 
 def frip_targets(samples: list[dict[str, str]], results_dir: str) -> list[str]:
-    return [f"{results_dir}/qc/atac/{sample}.frip.txt" for sample in sample_ids(samples)]
+    return [
+        f"{results_dir}/qc/atac/{sample}.frip.txt" for sample in sample_ids(samples)
+    ]
 
 
-def library_complexity_targets(samples: list[dict[str, str]], results_dir: str) -> list[str]:
-    return [f"{results_dir}/qc/atac/{sample}.library_complexity.txt" for sample in sample_ids(samples)]
+def library_complexity_targets(
+    samples: list[dict[str, str]], results_dir: str
+) -> list[str]:
+    return [
+        f"{results_dir}/qc/atac/{sample}.library_complexity.txt"
+        for sample in sample_ids(samples)
+    ]
 
 
-def fragment_length_targets(samples: list[dict[str, str]], results_dir: str) -> list[str]:
-    return [f"{results_dir}/qc/atac/{sample}.fragment_lengths.txt" for sample in sample_ids(samples)]
+def fragment_length_targets(
+    samples: list[dict[str, str]], results_dir: str
+) -> list[str]:
+    return [
+        f"{results_dir}/qc/atac/{sample}.fragment_lengths.txt"
+        for sample in sample_ids(samples)
+    ]
 
 
-def tss_enrichment_targets(samples: list[dict[str, str]], results_dir: str) -> list[str]:
-    return [f"{results_dir}/qc/atac/{sample}.tss_enrichment.txt" for sample in sample_ids(samples)]
+def tss_enrichment_targets(
+    samples: list[dict[str, str]], results_dir: str
+) -> list[str]:
+    return [
+        f"{results_dir}/qc/atac/{sample}.tss_enrichment.txt"
+        for sample in sample_ids(samples)
+    ]
 
 
-def transcriptome_bam_targets(samples: list[dict[str, str]], results_dir: str) -> list[str]:
-    return [f"{results_dir}/bam/transcriptome/{sample}.bam" for sample in sample_ids(samples)]
+def transcriptome_bam_targets(
+    samples: list[dict[str, str]], results_dir: str
+) -> list[str]:
+    return [
+        f"{results_dir}/bam/transcriptome/{sample}.bam"
+        for sample in sample_ids(samples)
+    ]
 
 
 def alignment_fastq_1(
-    samples: list[dict[str, str]], sample: str, results_dir: str, use_trimmed: bool
+    config: dict[str, Any],
+    samples: list[dict[str, str]],
+    sample: str,
+    results_dir: str,
+    use_trimmed: bool,
 ) -> list[str]:
     rows = units_by_sample(samples)[sample]
     if use_trimmed:
-        return [f"{results_dir}/fastq/trimmed/{unit_key(row)}_R1.fastq.gz" for row in rows]
-    return [fastq_for_read(samples, unit_key(row), "R1", results_dir) for row in rows]
+        return [
+            f"{results_dir}/fastq/trimmed/{unit_key(row)}_R1.fastq.gz"
+            for row in rows
+            if processed_unit_layout(config, samples, unit_key(row)) != "single_r2"
+        ]
+    return [
+        pre_trimming_fastq_for_read(config, samples, unit_key(row), "R1", results_dir)
+        for row in rows
+        if processed_unit_layout(config, samples, unit_key(row)) != "single_r2"
+    ]
 
 
 def alignment_fastq_2(
-    samples: list[dict[str, str]], sample: str, results_dir: str, use_trimmed: bool
+    config: dict[str, Any],
+    samples: list[dict[str, str]],
+    sample: str,
+    results_dir: str,
+    use_trimmed: bool,
 ) -> list[str]:
     rows = units_by_sample(samples)[sample]
     if use_trimmed:
         return [
             f"{results_dir}/fastq/trimmed/{unit_key(row)}_R2.fastq.gz"
             for row in rows
-            if row_is_paired(row)
+            if processed_unit_layout(config, samples, unit_key(row))
+            in {"paired", "single_r2"}
         ]
     return [
-        fastq_for_read(samples, unit_key(row), "R2", results_dir)
+        pre_trimming_fastq_for_read(config, samples, unit_key(row), "R2", results_dir)
         for row in rows
-        if row_is_paired(row)
+        if processed_unit_layout(config, samples, unit_key(row))
+        in {"paired", "single_r2"}
+    ]
+
+
+def pre_dedup_bam_targets(samples: list[dict[str, str]], results_dir: str) -> list[str]:
+    return [
+        item
+        for sample in sample_ids(samples)
+        for item in [
+            f"{results_dir}/bam/pre_dedup/{sample}.bam",
+            f"{results_dir}/bam/pre_dedup/{sample}.bam.bai",
+        ]
+    ]
+
+
+def umi_dedup_bam_targets(samples: list[dict[str, str]], results_dir: str) -> list[str]:
+    return [
+        item
+        for sample in sample_ids(samples)
+        for item in [
+            f"{results_dir}/bam/umi_dedup/{sample}.bam",
+            f"{results_dir}/bam/umi_dedup/{sample}.bam.bai",
+        ]
+    ]
+
+
+def pre_dedup_qc_targets(samples: list[dict[str, str]], results_dir: str) -> list[str]:
+    return [
+        item
+        for sample in sample_ids(samples)
+        for item in [
+            f"{results_dir}/qc/bam/pre_dedup/{sample}.flagstat.txt",
+            f"{results_dir}/qc/bam/pre_dedup/{sample}.idxstats.txt",
+        ]
+    ]
+
+
+def clip_coverage_targets(samples: list[dict[str, str]], results_dir: str) -> list[str]:
+    return [
+        f"{results_dir}/tracks/read_coverage/{sample}.{strand}.bw"
+        for sample in sample_ids(samples)
+        for strand in ("plus", "minus")
+    ]
+
+
+def crosslink_site_targets(
+    samples: list[dict[str, str]], results_dir: str
+) -> list[str]:
+    return [
+        f"{results_dir}/tracks/crosslink_sites/{sample}.{strand}.bw"
+        for sample in sample_ids(samples)
+        for strand in ("plus", "minus")
+    ]
+
+
+def sample_metadata(samples: list[dict[str, str]], sample: str, key: str) -> str:
+    values = {row.get(key, "") for row in units_by_sample(samples)[sample]}
+    if len(values) != 1:
+        raise ValueError(f"Sample {sample} has inconsistent {key}: {sorted(values)}")
+    return values.pop()
+
+
+def enrichment_pairs(samples: list[dict[str, str]]) -> list[tuple[str, str]]:
+    pairs: list[tuple[str, str]] = []
+    known = set(sample_ids(samples))
+    for sample in sample_ids(samples):
+        if sample_metadata(samples, sample, "library_type") != "ip":
+            continue
+        control = sample_metadata(samples, sample, "input_sample_id")
+        if (
+            control
+            and control in known
+            and sample_metadata(samples, control, "library_type") == "sm_input"
+        ):
+            pairs.append((sample, control))
+    return pairs
+
+
+def enrichment_targets(samples: list[dict[str, str]], results_dir: str) -> list[str]:
+    return [
+        f"{results_dir}/tracks/enrichment/{sample}.vs.{control}.{strand}.bw"
+        for sample, control in enrichment_pairs(samples)
+        for strand in ("plus", "minus")
     ]
 
 
 def sample_strandedness(samples: list[dict[str, str]], sample: str) -> str:
-    values = {row.get("strandedness", "unstranded") for row in units_by_sample(samples)[sample]}
+    values = {
+        row.get("strandedness", "unstranded")
+        for row in units_by_sample(samples)[sample]
+    }
     if len(values) != 1:
-        raise ValueError(f"Sample {sample} has mixed strandedness values: {sorted(values)}")
+        raise ValueError(
+            f"Sample {sample} has mixed strandedness values: {sorted(values)}"
+        )
     return values.pop() or "unstranded"
 
 
@@ -333,20 +702,28 @@ def bwa_mem2_reads_arg(r1: Any, r2: Any) -> str:
     return f"<(gzip -cdf {r1_files})"
 
 
-def featurecounts_paired_end(samples: list[dict[str, str]], config: dict[str, Any]) -> bool:
+def featurecounts_paired_end(
+    samples: list[dict[str, str]], config: dict[str, Any]
+) -> bool:
     params = config.get("modules", {}).get("gene_counts", {}) or {}
     value = params.get("paired_end", "auto")
     layout = run_layout(samples)
     if layout == "mixed":
-        raise ValueError("featureCounts requires all samples in a run to share PE/SE layout")
+        raise ValueError(
+            "featureCounts requires all samples in a run to share PE/SE layout"
+        )
     if value == "auto":
         return layout == "paired"
     if bool(value) and layout == "single":
-        raise ValueError("featureCounts paired_end is true, but the sample sheet is single-end")
+        raise ValueError(
+            "featureCounts paired_end is true, but the sample sheet is single-end"
+        )
     return bool(value)
 
 
-def featurecounts_count_read_pairs(samples: list[dict[str, str]], config: dict[str, Any]) -> bool:
+def featurecounts_count_read_pairs(
+    samples: list[dict[str, str]], config: dict[str, Any]
+) -> bool:
     params = config.get("modules", {}).get("gene_counts", {}) or {}
     value = params.get("count_read_pairs", "auto")
     if value == "auto":
@@ -359,7 +736,9 @@ def featurecounts_strand(samples: list[dict[str, str]], config: dict[str, Any]) 
     module = config.get("modules", {}).get("gene_counts", {}) or {}
     value = module.get("strandedness", "sample")
     if value == "sample":
-        values = {row.get("strandedness", "unstranded") or "unstranded" for row in samples}
+        values = {
+            row.get("strandedness", "unstranded") or "unstranded" for row in samples
+        }
         if len(values) != 1:
             raise ValueError(
                 "featureCounts runs all samples together and requires one strandedness; "

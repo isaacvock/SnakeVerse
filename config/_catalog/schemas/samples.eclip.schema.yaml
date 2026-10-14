@@ -1,0 +1,37 @@
+title: "SnakeVerse eCLIP/ecCLIP sample sheet"
+type: object
+required_columns:
+  - sample_id
+  - unit_id
+  - fastq_1
+  - condition
+  - replicate
+  - library_type
+  - target
+columns:
+  sample_id:
+    description: "One biological library/replicate identifier."
+  unit_id:
+    description: "Technical unit or lane; units for one sample are merged for alignment."
+  fastq_1:
+    description: "R1 FASTQ. Rows in one raw pool repeat identical paths."
+  fastq_2:
+    description: "R2 FASTQ; required by the supplied raw eCLIP/ecCLIP recipes."
+  condition:
+    description: "Cell type, treatment, or experimental condition."
+  replicate:
+    description: "Biological replicate label."
+  library_type:
+    description: "One of ip, sm_input, or tag_control."
+  target:
+    description: "Immunoprecipitated factor or control target."
+  pool_id:
+    description: "Physical FASTQ pool identifier, required for raw inline demultiplexing."
+  input_sample_id:
+    description: "For an IP, the directly matched sm_input sample_id."
+  inline_barcodes:
+    description: "Comma-separated Name=SEQUENCE assignments; multiple names may map to one unit."
+  sra_id:
+    description: "Optional SRA accession when local FASTQ paths are blank."
+  sra_layout:
+    description: "Optional single or paired layout hint for SRA download."

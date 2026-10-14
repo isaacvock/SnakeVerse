@@ -6,8 +6,12 @@ rule samtools_filter:
         bam=lambda wildcards: pre_filter_bam_path(wildcards.sample),
         bai=lambda wildcards: pre_filter_bai_path(wildcards.sample)
     output:
-        bam=f"{RESULTS_DIR}/bam/filtered/{{sample}}.bam",
-        bai=f"{RESULTS_DIR}/bam/filtered/{{sample}}.bam.bai"
+        bam=temp(f"{RESULTS_DIR}/bam/filtered/{{sample}}.bam")
+            if module_enabled("umi_deduplication")
+            else f"{RESULTS_DIR}/bam/filtered/{{sample}}.bam",
+        bai=temp(f"{RESULTS_DIR}/bam/filtered/{{sample}}.bam.bai")
+            if module_enabled("umi_deduplication")
+            else f"{RESULTS_DIR}/bam/filtered/{{sample}}.bam.bai"
     log:
         f"{RESULTS_DIR}/logs/samtools/filter.{{sample}}.log"
     threads:
