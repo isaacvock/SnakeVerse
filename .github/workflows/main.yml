@@ -26,6 +26,7 @@ jobs:
             python=3.12
             snakemake
             pyyaml
+            pytest
             fastqc
             fastp
             cutadapt
