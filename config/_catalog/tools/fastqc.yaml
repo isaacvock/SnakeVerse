@@ -2,11 +2,9 @@
 # thread count. Set a value to null/false to omit it; true emits a bare flag.
 # Docs: https://www.bioinformatics.babraham.ac.uk/projects/fastqc/
 tool: fastqc
-version: "0.12"
+version: "0.13"
 
 params:
-  # Leave the FastQC HTML/ZIP report compressed instead of extracting it.
-  noextract: true
   # Suppress routine console progress messages. Errors still go to the log.
   quiet: false
 

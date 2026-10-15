@@ -1,8 +1,7 @@
 tool: fastqc
-version: "0.12"
+version: "0.13"
 
 params:
-  noextract: true
   quiet: true
 
 extra: ""
