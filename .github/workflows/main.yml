@@ -29,7 +29,7 @@ jobs:
             pytest
             fastqc
             fastp
-            "cutadapt>=4.4"
+            cutadapt>=4.4
             sra-tools
             pigz
             bowtie2
