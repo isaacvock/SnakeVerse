@@ -21,6 +21,7 @@ rule samtools_bam_qc:
         workflow_file("envs/samtools.yaml")
     shell:
         """
+        set -euo pipefail
         mkdir -p $(dirname {output.flagstat}) $(dirname {log})
         samtools flagstat -@ {threads} {input.bam} > {output.flagstat} 2> {log}
         samtools idxstats {input.bam} > {output.idxstats} 2>> {log}

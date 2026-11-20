@@ -4,11 +4,23 @@ import shlex
 from collections.abc import Mapping
 from typing import Any
 
+from clip import eclip_barcode_adapter_overrides
 from samples import (
     featurecounts_count_read_pairs,
     featurecounts_paired_end,
     featurecounts_strand,
 )
+
+MULTI_STAGE_TOOL_SECTIONS: dict[str, set[str]] = {
+    "bowtie2": {"index", "align"},
+    "bwa_mem2": {"index", "align"},
+    "cutadapt": {"demultiplex", "trim"},
+    "rsem": {"prepare_reference", "quant"},
+    "samtools": {"sort", "filter"},
+    "sra_tools": {"fasterq_dump"},
+    "star": {"index", "align"},
+    "umi_tools": {"extract", "dedup"},
+}
 
 
 def _dash(name: str) -> str:
@@ -63,9 +75,12 @@ def render_cutadapt(params: Mapping[str, Any]) -> str:
         "cut_r2": "-U",
         "quality_cutoff": "-q",
         "minimum_length": "-m",
+        "minimum_overlap": "-O",
         "error_rate": "-e",
         "times": "-n",
         "nextseq_trim": "--nextseq-trim",
+        "poly_a": "--poly-a",
+        "match_read_wildcards": "--match-read-wildcards",
     }
     parts: list[str] = []
     for key, value in params.items():
@@ -262,21 +277,61 @@ def render_featurecounts_for_config(
 
 
 def trimming_adapter_params(
-    config: Mapping[str, Any], tool: str, paired: bool
+    config: Mapping[str, Any],
+    tool: str,
+    layout_or_paired: str | bool,
+    samples: list[dict[str, str]] | None = None,
+    unit: str | None = None,
 ) -> dict[str, Any]:
     """Render the run-owned adapter policy into tool-specific parameters."""
+    layout = (
+        ("paired" if layout_or_paired else "single")
+        if isinstance(layout_or_paired, bool)
+        else str(layout_or_paired)
+    )
+    paired = layout == "paired"
     trimming = (config.get("modules", {}) or {}).get("trimming", {}) or {}
     adapters = trimming.get("adapters", {}) or {}
     mode = adapters.get("mode", "none")
+    trimming_params = trimming.get("params", {}) or {}
+    r2_single_remap: dict[str, Any] = {}
+    if layout == "single_r2" and tool == "cutadapt":
+        if trimming_params.get("cut_r2") not in (None, ""):
+            r2_single_remap["cut_r1"] = trimming_params["cut_r2"]
+        if trimming_params.get("front_r2") not in (None, ""):
+            r2_single_remap["front_r1"] = trimming_params["front_r2"]
+
     if mode == "none":
-        return {}
+        return r2_single_remap
     if mode == "auto":
-        return {"detect_adapter_for_pe": True} if tool == "fastp" and paired else {}
+        return {"detect_adapter_for_pe": True} if tool == "fastp" and paired else r2_single_remap
     if mode != "sequences":
-        return {}
+        return r2_single_remap
+
+    if (
+        tool == "cutadapt"
+        and bool(adapters.get("barcode_aware", False))
+        and samples is not None
+        and unit is not None
+    ):
+        if layout == "single_r2":
+            derived = eclip_barcode_adapter_overrides(config, samples, unit, True)
+            return {
+                **r2_single_remap,
+                "adapter_r1": derived.get("adapter_r2") or adapters.get("read2"),
+                "match_read_wildcards": derived.get("match_read_wildcards"),
+            }
+        return eclip_barcode_adapter_overrides(config, samples, unit, paired)
 
     read1 = adapters.get("read1")
     read2 = adapters.get("read2")
+    if layout == "single_r2":
+        single_adapter = read2 if read2 not in (None, "") else read1
+        if tool == "fastp":
+            return {"adapter_sequence": single_adapter}
+        if tool == "cutadapt":
+            return {**r2_single_remap, "adapter_r1": single_adapter}
+        return {}
     if tool == "fastp":
         return {
             "adapter_sequence": read1,
@@ -367,14 +422,22 @@ def tool_profile(config: Mapping[str, Any], tool: str) -> Mapping[str, Any]:
     return config.get("tools", {}).get(tool, {})
 
 
-def tool_extra(config: Mapping[str, Any], tool: str, section: str | None = None) -> str:
+def tool_extra(
+    config: Mapping[str, Any], tool: str, section: str | None = None
+) -> str:
     """Return verbatim CLI arguments, optionally scoped to one tool command."""
     extra = tool_profile(config, tool).get("extra", "")
     if isinstance(extra, Mapping):
         if section is None:
             return str(extra.get("default") or "")
         return str(extra.get(section) or "")
-    return str(extra or "")
+    text = str(extra or "")
+    if tool in MULTI_STAGE_TOOL_SECTIONS and text.strip():
+        raise ValueError(
+            f"Tool '{tool}' has multiple stages and requires a stage mapping for "
+            f"tools/{tool}.yaml extra ({sorted(MULTI_STAGE_TOOL_SECTIONS[tool])})"
+        )
+    return text
 
 
 def module_tool_extra(
@@ -396,6 +459,7 @@ def render_tool_params(
     section: str | None = None,
     overrides: Mapping[str, Any] | None = None,
     module: str | None = None,
+    drop_keys: tuple[str, ...] = (),
 ) -> str:
     profile = tool_profile(config, tool)
     params: Mapping[str, Any] = profile.get("params", {}) or {}
@@ -422,6 +486,8 @@ def render_tool_params(
         merged.update(
             {key: value for key, value in overrides.items() if value is not None}
         )
+    for key in drop_keys:
+        merged.pop(key, None)
     if tool == "samtools" and section == "filter":
         return render_samtools_view(merged)
     if tool == "samtools" and section == "sort":

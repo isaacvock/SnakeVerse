@@ -9,4 +9,6 @@ params:
     no_mixed: false
     no_discordant: false
 
-extra: ""
+extra:
+  index: ""
+  align: ""

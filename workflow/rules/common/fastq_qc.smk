@@ -23,6 +23,7 @@ rule fastqc:
         extra=lambda wildcards: tool_extra(config, "fastqc")
     shell:
         """
+        set -euo pipefail
         mkdir -p {output} $(dirname {log})
         fastqc --threads {threads} {params.rendered} {params.extra} --outdir {output} {input} > {log} 2>&1
         """

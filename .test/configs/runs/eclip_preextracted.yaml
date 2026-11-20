@@ -10,27 +10,38 @@ preprocessing: {input_stage: umi_extracted}
 modules:
   fastq_qc: {enabled: true}
   inline_barcode_demultiplexing:
-    enabled: true
+    enabled: false
     read: R1
     end: 5prime
     max_mismatches: 0
     allow_indels: false
   umi_extraction:
-    enabled: true
+    enabled: false
     method: string
     read1: {role: biological}
     read2: {pattern: NNNNN, location: 5prime, role: biological}
   trimming:
     enabled: true
     tool: cutadapt
-    adapters: {mode: none, read1: null, read2: null}
-    params: {quality_cutoff: "0,0", minimum_length: 20, times: 1}
+    adapters:
+      mode: sequences
+      barcode_aware: true
+      read1: AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC
+      read2: AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT
+    params: {quality_cutoff: 6, minimum_length: 18, minimum_overlap: 5, times: 2}
   alignment:
     enabled: true
     tool: star
     transcriptome_bam: false
     params:
-      align: {outFilterMultimapNmax: 1, alignEndsType: EndToEnd, quantMode: ""}
+      align:
+        outFilterMultimapNmax: 1
+        alignEndsType: EndToEnd
+        outFilterMismatchNoverReadLmax: 1.0
+        outFilterMismatchNoverLmax: 0.3
+        outFilterMismatchNmax: 10
+        outFilterScoreMin: 10
+        quantMode: ""
   mark_duplicates: {enabled: false}
   bam_filter:
     enabled: true
@@ -41,12 +52,12 @@ modules:
     exclude_contigs: []
   umi_deduplication:
     enabled: true
-    method: directional
-    edit_distance: 1
+    method: unique
+    edit_distance: 0
     strand_aware: true
     spliced_is_unique: true
     umi_tag: RX
-    qname_regex: '[|]UMI=(?P<umi>[ACGTN]+)$'
+    qname_regex: "^(?P<umi>[ACGTN]+):"
   bam_qc: {enabled: true}
   coverage: {enabled: false}
   crosslink_sites: {enabled: false}
@@ -55,6 +66,7 @@ modules:
 
 resources:
   fastqc: {threads: 1, mem_mb: 512, runtime_min: 15}
+  cutadapt_demultiplex: {threads: 1, mem_mb: 512, runtime_min: 15}
   cutadapt: {threads: 1, mem_mb: 512, runtime_min: 15}
   star: {threads: 2, mem_mb: 2048, runtime_min: 60}
   star_index: {threads: 2, mem_mb: 2048, runtime_min: 60}

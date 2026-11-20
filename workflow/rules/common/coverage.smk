@@ -1,4 +1,8 @@
-from clip import track_strand_args
+from clip import (
+    coverage_normalization_mode,
+    representative_count_samtools_args,
+    track_strand_args,
+)
 from params import module_tool_extra, render_tool_params, resource_value
 from tracks import coverage_strand_arg
 
@@ -22,15 +26,16 @@ if module_settings("coverage").get("strand_mode") == "separate":
         conda:
             workflow_file("envs/deeptools.yaml")
         params:
+            norm_mode=lambda wildcards: coverage_normalization_mode(config),
+            count_args=lambda wildcards: representative_count_samtools_args(
+                config, SAMPLES, wildcards.sample, "coverage"
+            ),
             rendered=lambda wildcards: render_tool_params(
                 config,
                 "deeptools",
                 module="coverage",
-                overrides={
-                    "effective_genome_size": config.get("reference", {}).get(
-                        "effective_genome_size"
-                    )
-                },
+                overrides={"normalize_using": "None"},
+                drop_keys=("effective_genome_size",),
             ),
             strand=lambda wildcards: track_strand_args(
                 config, SAMPLES, wildcards.sample, wildcards.strand, "coverage"
@@ -39,18 +44,15 @@ if module_settings("coverage").get("strand_mode") == "separate":
         shell:
             """
             set -euo pipefail
-            mkdir -p $(dirname {output.bw}) $(dirname {log})
-            if ! bamCoverage -b {input.bam} -o {output.bw} -p {threads} \
-                {params.rendered} {params.strand} {params.extra} > {log} 2>&1; then
-                if grep -q "ZeroDivisionError" {log}; then
-                    echo "SnakeVerse: selected strand is empty; writing an unnormalized zero track." >> {log}
-                    bamCoverage -b {input.bam} -o {output.bw} -p {threads} \
-                        {params.rendered} {params.strand} {params.extra} \
-                        --normalizeUsing None >> {log} 2>&1
-                else
-                    exit 1
-                fi
+            mkdir -p $(dirname {output.bw:q}) $(dirname {log:q})
+            scale_factor="1"
+            if [ "{params.norm_mode}" = "CPM" ]; then
+                total_reads=$(samtools view -@ {threads} -c {params.count_args} {input.bam:q})
+                scale_factor=$(python -c 'import sys; n = int(sys.argv[1]); print(f"{{1000000.0 / n:.12g}}" if n > 0 else "1")' "$total_reads")
             fi
+            bamCoverage -b {input.bam:q} -o {output.bw:q} -p {threads} \
+                --scaleFactor "$scale_factor" \
+                {params.rendered} {params.strand} {params.extra} > {log:q} 2>&1
             """
 else:
     rule bam_coverage:
@@ -83,6 +85,7 @@ else:
             extra=lambda wildcards: module_tool_extra(config, "coverage", "deeptools")
         shell:
             """
+            set -euo pipefail
             mkdir -p $(dirname {output.bw}) $(dirname {log})
             bamCoverage -b {input.bam} -o {output.bw} -p {threads} \
                 {params.rendered} {params.strand} {params.extra} > {log} 2>&1

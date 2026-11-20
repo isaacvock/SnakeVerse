@@ -31,24 +31,39 @@ if TRIMMING_TOOL == "fastp":
                 config,
                 "fastp",
                 overrides=trimming_adapter_params(
-                    config, "fastp", processed_unit_layout(config, SAMPLES, wildcards.unit) == "paired"
+                    config,
+                    "fastp",
+                    processed_unit_layout(config, SAMPLES, wildcards.unit),
+                    SAMPLES,
+                    wildcards.unit,
                 ),
                 module="trimming",
+                drop_keys=(
+                    ()
+                    if processed_unit_layout(config, SAMPLES, wildcards.unit) == "paired"
+                    else ("detect_adapter_for_pe", "adapter_sequence_r2")
+                ),
             ),
             extra=lambda wildcards: module_tool_extra(config, "trimming", "fastp")
         shell:
             """
+            set -euo pipefail
             mkdir -p $(dirname {output.r1}) $(dirname {output.html}) $(dirname {log})
             if [ "{params.layout}" = "paired" ]; then
                 fastp {params.rendered} {params.extra} --thread {threads} \
                     --in1 {input.r1} --in2 {input.r2} \
                     --out1 {output.r1} --out2 {output.r2} \
                     --html {output.html} --json {output.json} > {log} 2>&1
+            elif [ "{params.layout}" = "single_r2" ]; then
+                fastp {params.rendered} {params.extra} --thread {threads} \
+                    --in1 {input.r2} --out1 {output.r2} \
+                    --html {output.html} --json {output.json} > {log} 2>&1
+                gzip -c /dev/null > {output.r1}
             else
                 fastp {params.rendered} {params.extra} --thread {threads} \
                     --in1 {input.r1} --out1 {output.r1} \
                     --html {output.html} --json {output.json} > {log} 2>&1
-                : > {output.r2}
+                gzip -c /dev/null > {output.r2}
             fi
             """
 elif TRIMMING_TOOL == "cutadapt":
@@ -78,21 +93,37 @@ elif TRIMMING_TOOL == "cutadapt":
                 config,
                 "cutadapt",
                 overrides=trimming_adapter_params(
-                    config, "cutadapt", processed_unit_layout(config, SAMPLES, wildcards.unit) == "paired"
+                    config,
+                    "cutadapt",
+                    processed_unit_layout(config, SAMPLES, wildcards.unit),
+                    SAMPLES,
+                    wildcards.unit,
                 ),
                 module="trimming",
+                drop_keys=(
+                    ()
+                    if processed_unit_layout(config, SAMPLES, wildcards.unit) == "paired"
+                    else ("adapter_r2", "front_r2", "cut_r2")
+                ),
             ),
-            extra=lambda wildcards: module_tool_extra(config, "trimming", "cutadapt")
+            extra=lambda wildcards: module_tool_extra(
+                config, "trimming", "cutadapt", section="trim"
+            )
         shell:
             """
+            set -euo pipefail
             mkdir -p $(dirname {output.r1}) $(dirname {log})
             if [ "{params.layout}" = "paired" ]; then
                 cutadapt {params.rendered} {params.extra} --cores {threads} \
                     -o {output.r1} -p {output.r2} {input.r1} {input.r2} > {log} 2>&1
+            elif [ "{params.layout}" = "single_r2" ]; then
+                cutadapt {params.rendered} {params.extra} --cores {threads} \
+                    -o {output.r2} {input.r2} > {log} 2>&1
+                gzip -c /dev/null > {output.r1}
             else
                 cutadapt {params.rendered} {params.extra} --cores {threads} \
                     -o {output.r1} {input.r1} > {log} 2>&1
-                : > {output.r2}
+                gzip -c /dev/null > {output.r2}
             fi
             """
 else:

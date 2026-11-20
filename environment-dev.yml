@@ -23,7 +23,7 @@ dependencies:
   # The real workflow should still use per-rule conda envs.
   - fastqc
   - fastp
-  - cutadapt
+  - cutadapt>=4.4
   - sra-tools
   - bowtie2
   - bwa-mem2

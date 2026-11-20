@@ -1,6 +1,10 @@
 tool: sra_tools
 version: "3"
 
-params: {}
+params:
+  fasterq_dump:
+    progress: false
+    include_technical: false
 
-extra: ""
+extra:
+  fasterq_dump: ""

@@ -1,6 +1,6 @@
-from clip import dedup_args, qname_umi_regex
+from clip import dedup_args, qname_umi_regex, umi_sam_tag
 from params import module_tool_extra, resource_value
-from samples import processed_sample_layout
+from samples import processed_sample_layout, sample_has_inline_barcodes
 
 
 rule tag_qname_umi:
@@ -21,13 +21,15 @@ rule tag_qname_umi:
         workflow_file("envs/umi_tools.yaml")
     params:
         regex=lambda wildcards: qname_umi_regex(config),
+        umi_tag=lambda wildcards: umi_sam_tag(config),
         script=lambda wildcards: workflow_file("scripts/qname_umi_to_rx.py")
     shell:
         """
         set -euo pipefail
         mkdir -p $(dirname {output.bam}) $(dirname {log})
         python {params.script} \
-            --input {input.bam} --output {output.bam} --regex {params.regex:q} > {log} 2>&1
+            --input {input.bam} --output {output.bam} \
+            --regex {params.regex:q} --tag {params.umi_tag:q} > {log} 2>&1
         samtools index {output.bam} {output.bai} >> {log} 2>&1
         """
 
@@ -52,10 +54,14 @@ rule umi_tools_dedup:
         workflow_file("envs/umi_tools.yaml")
     params:
         rendered=lambda wildcards: dedup_args(
-            config, processed_sample_layout(config, SAMPLES, wildcards.sample) == "paired"
+            config,
+            processed_sample_layout(config, SAMPLES, wildcards.sample) == "paired",
+            sample_has_inline_barcodes(SAMPLES, wildcards.sample),
         ),
         stats=lambda wildcards: f"{RESULTS_DIR}/qc/umi_tools/{wildcards.sample}",
-        extra=lambda wildcards: module_tool_extra(config, "umi_deduplication", "umi_tools")
+        extra=lambda wildcards: module_tool_extra(
+            config, "umi_deduplication", "umi_tools", section="dedup"
+        )
     shell:
         """
         set -euo pipefail
@@ -86,6 +92,7 @@ rule samtools_prededup_qc:
         workflow_file("envs/samtools.yaml")
     shell:
         """
+        set -euo pipefail
         mkdir -p $(dirname {output.flagstat}) $(dirname {log})
         samtools flagstat -@ {threads} {input.bam} > {output.flagstat} 2> {log}
         samtools idxstats {input.bam} > {output.idxstats} 2>> {log}

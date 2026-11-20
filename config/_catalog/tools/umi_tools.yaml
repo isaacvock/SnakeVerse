@@ -6,6 +6,8 @@ version: "1.1.6"
 
 params: {}
 
-# Appended to both extract and dedup commands when a run module does not
-# provide a more specific override.
-extra: ""
+# Command-specific verbatim options isolated between UMI extraction and BAM
+# deduplication.
+extra:
+  extract: ""
+  dedup: ""

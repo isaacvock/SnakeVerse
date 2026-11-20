@@ -6,4 +6,6 @@ params:
   error_rate: 0.1
   times: 1
   nextseq_trim:
-extra: ""
+extra:
+  demultiplex: ""
+  trim: ""

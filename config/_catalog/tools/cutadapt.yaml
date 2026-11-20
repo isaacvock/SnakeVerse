@@ -20,5 +20,8 @@ params:
 # Adapter policy and sequences are owned by modules.trimming.adapters in the
 # run config so they cannot silently conflict with this file.
 
-# Appended verbatim for uncommon Cutadapt options.
-extra: ""
+# Command-specific verbatim options isolated between inline-barcode
+# demultiplexing and adapter/quality trimming.
+extra:
+  demultiplex: ""
+  trim: ""

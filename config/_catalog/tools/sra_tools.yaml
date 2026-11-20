@@ -9,6 +9,9 @@ params:
   fasterq_dump:
     # Print periodic progress information into the rule log.
     progress: false
+    # Include technical/barcode reads (--include-technical) when an SRA archive
+    # stores UMI or barcode reads in a technical spot segment.
+    include_technical: false
 
 # Appended verbatim only to fasterq-dump.
 extra:

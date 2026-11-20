@@ -4,21 +4,24 @@ from pathlib import Path
 import re
 from typing import Any
 
+from clip import coverage_normalization_mode, validate_qname_regex
+from params import MULTI_STAGE_TOOL_SECTIONS
 from refs import INDEX_KEYS, genome_fasta, index_requires_build, path_exists
 from samples import (
     featurecounts_paired_end,
     featurecounts_strand,
     has_sra_samples,
-    required_columns_for_assay,
     input_stage,
     parse_inline_barcodes,
     processed_sample_layout,
+    processed_unit_layout,
+    required_columns_for_assay,
     sample_ids,
-    sample_metadata,
     sample_layout,
+    sample_metadata,
     unit_key,
+    units_by_sample,
 )
-from clip import validate_qname_regex
 
 TRIMMING_TOOLS = {"cutadapt", "fastp"}
 ALIGNMENT_TOOLS = set(INDEX_KEYS)
@@ -36,7 +39,7 @@ FEATURECOUNTS_RUN_KEYS = {
 RSEM_RUN_KEYS = {"alignments", "paired_end", "strandedness", "num_threads"}
 ADAPTER_TOOL_KEYS = {
     "fastp": {"detect_adapter_for_pe", "adapter_sequence", "adapter_sequence_r2"},
-    "cutadapt": {"adapter_r1", "adapter_r2"},
+    "cutadapt": {"adapter_r1", "adapter_r2", "front_r1", "front_r2"},
 }
 
 
@@ -66,7 +69,7 @@ def _required_tools(config: dict[str, Any], samples: list[dict[str, str]]) -> li
     if (
         _enabled(config, "inline_barcode_demultiplexing")
         and input_stage(config) == "raw"
-    ):
+    ) or any(row.get("inline_barcodes") for row in samples):
         tools.append("cutadapt")
     if _enabled(config, "umi_extraction") and input_stage(config) != "umi_extracted":
         tools.append("umi_tools")
@@ -97,6 +100,31 @@ def _required_tools(config: dict[str, Any], samples: list[dict[str, str]]) -> li
     return sorted({tool for tool in tools if tool})
 
 
+def _validate_tool_extras(config: dict[str, Any], errors: list[str]) -> None:
+    active_tools = config.get("tools", {}) or {}
+    for tool_name, profile in sorted(active_tools.items()):
+        if tool_name not in MULTI_STAGE_TOOL_SECTIONS or not isinstance(profile, dict):
+            continue
+        allowed = MULTI_STAGE_TOOL_SECTIONS[tool_name]
+        extra = profile.get("extra")
+        if extra in (None, ""):
+            continue
+        if not isinstance(extra, dict):
+            if str(extra).strip():
+                errors.append(
+                    f"tools/{tool_name}.yaml extra must be a stage mapping "
+                    f"({', '.join(sorted(allowed))}), not a nonempty scalar"
+                )
+            continue
+        unknown = sorted(set(extra).difference(allowed))
+        if unknown:
+            errors.append(
+                f"tools/{tool_name}.yaml extra has unknown stage(s): "
+                + ", ".join(unknown)
+                + f" (allowed: {', '.join(sorted(allowed))})"
+            )
+
+
 def _validate_adapters(
     config: dict[str, Any],
     samples: list[dict[str, str]],
@@ -110,7 +138,22 @@ def _validate_adapters(
     if tool not in TRIMMING_TOOLS:
         errors.append(f"Unsupported modules.trimming.tool: {tool}")
         return
+
+    tool_params = config.get("tools", {}).get(tool, {}).get("params", {}) or {}
+    module_params = trimming.get("params", {}) or {}
+    effective_params = {**tool_params, **module_params}
+    poly_a = bool(effective_params.get("poly_a", False))
+    if poly_a and tool != "cutadapt":
+        errors.append(
+            "modules.trimming.params.poly_a is supported only when modules.trimming.tool is cutadapt"
+        )
+
     adapters = trimming.get("adapters", {}) or {}
+    if bool(adapters.get("barcode_aware", False)) and tool != "cutadapt":
+        errors.append(
+            "modules.trimming.adapters.barcode_aware requires modules.trimming.tool: cutadapt"
+        )
+
     mode = adapters.get("mode")
     if mode not in {"auto", "sequences", "none"}:
         errors.append("modules.trimming.adapters.mode must be auto, sequences, or none")
@@ -119,25 +162,28 @@ def _validate_adapters(
             "Adapter auto-detection is supported only when modules.trimming.tool is fastp"
         )
     elif mode == "sequences":
-        if not adapters.get("read1"):
+        unit_layouts: set[str] = set()
+        for row in samples:
+            try:
+                unit_layouts.add(processed_unit_layout(config, samples, unit_key(row)))
+            except ValueError:
+                continue
+        needs_r1 = bool(unit_layouts.intersection({"paired", "single"})) or not unit_layouts
+        needs_r2 = bool(unit_layouts.intersection({"paired", "single_r2"}))
+        if needs_r1 and not adapters.get("read1"):
             errors.append(
                 "Adapter mode sequences requires modules.trimming.adapters.read1"
             )
-        paired = any(
-            processed_sample_layout(config, samples, sample) == "paired"
-            for sample in sample_ids(samples)
-        )
-        if paired and not adapters.get("read2"):
+        if needs_r2 and not adapters.get("read2"):
             errors.append(
-                "Paired-end adapter mode sequences requires modules.trimming.adapters.read2"
+                "Paired-end or single_r2 adapter mode sequences requires modules.trimming.adapters.read2"
             )
-    elif mode == "none":
+    elif mode == "none" and not poly_a:
         warnings.append(
             "Trimming is enabled without adapter removal (adapters.mode: none)"
         )
 
-    params = config.get("tools", {}).get(tool, {}).get("params", {}) or {}
-    conflicts = sorted(ADAPTER_TOOL_KEYS.get(tool, set()).intersection(params))
+    conflicts = sorted(ADAPTER_TOOL_KEYS.get(tool, set()).intersection(tool_params))
     if conflicts:
         errors.append(
             f"Adapter settings belong in modules.trimming.adapters; remove from tools/{tool}.yaml: "
@@ -197,6 +243,22 @@ def _validate_eclip(
                 "modules.inline_barcode_demultiplexing.max_mismatches must be >= 0"
             )
 
+    for row in samples:
+        if row.get("sra_id") and not row.get("fastq_1"):
+            if row.get("sra_layout") not in {"single", "paired"}:
+                errors.append(
+                    f"eCLIP SRA sample unit {unit_key(row)} requires explicit sra_layout (single or paired)"
+                )
+
+    raw_layouts: set[str] = set()
+    for sample in sample_ids(samples):
+        try:
+            raw_layouts.add(sample_layout(samples, sample))
+        except ValueError:
+            continue
+    if len(raw_layouts) > 1:
+        errors.append("eCLIP runs must use one raw FASTQ layout")
+
     umi = _module(config, "umi_extraction")
     if _enabled(config, "umi_extraction"):
         method = str(umi.get("method", "string"))
@@ -247,14 +309,42 @@ def _validate_eclip(
             errors.append(
                 "String UMI extraction requires all configured UMIs at the same read end"
             )
-        if str((umi.get("read1", {}) or {}).get("role", "biological")) == "umi_only":
-            errors.append("UMI-only R1 is not supported; use R2 as the UMI-only mate")
-        if str(
-            (umi.get("read2", {}) or {}).get("role", "biological")
-        ) == "umi_only" and not ((umi.get("read2", {}) or {}).get("pattern")):
+        r1_settings = umi.get("read1", {}) or {}
+        r2_settings = umi.get("read2", {}) or {}
+        r1_role = (
+            str(r1_settings.get("role", "biological"))
+            if isinstance(r1_settings, dict)
+            else "biological"
+        )
+        r2_role = (
+            str(r2_settings.get("role", "biological"))
+            if isinstance(r2_settings, dict)
+            else "biological"
+        )
+        if r1_role == "umi_only" and r2_role == "umi_only":
+            errors.append("read1 and read2 cannot both have role: umi_only")
+        if r1_role == "umi_only" and not (
+            isinstance(r1_settings, dict) and r1_settings.get("pattern")
+        ):
+            errors.append(
+                "An UMI-only R1 requires modules.umi_extraction.read1.pattern"
+            )
+        if r2_role == "umi_only" and not (
+            isinstance(r2_settings, dict) and r2_settings.get("pattern")
+        ):
             errors.append(
                 "An UMI-only R2 requires modules.umi_extraction.read2.pattern"
             )
+        if stage != "umi_extracted":
+            r2_has_pattern = bool(
+                isinstance(r2_settings, dict) and r2_settings.get("pattern")
+            )
+            if (
+                r2_has_pattern or r1_role == "umi_only" or r2_role == "umi_only"
+            ) and raw_layouts == {"single"}:
+                errors.append(
+                    "UMI extraction from R2 or with a umi_only mate requires paired-end raw inputs"
+                )
 
     if _enabled(config, "umi_deduplication"):
         dedup = _module(config, "umi_deduplication")
@@ -287,9 +377,6 @@ def _validate_eclip(
         except (ValueError, re.error) as exc:
             errors.append(str(exc))
 
-    raw_layouts = {sample_layout(samples, sample) for sample in sample_ids(samples)}
-    if len(raw_layouts) > 1:
-        errors.append("eCLIP runs must use one raw FASTQ layout")
     for sample in sample_ids(samples):
         try:
             processed_sample_layout(config, samples, sample)
@@ -347,45 +434,72 @@ def _validate_eclip(
             except ValueError as exc:
                 errors.append(str(exc))
 
+    demux_enabled = _enabled(config, "inline_barcode_demultiplexing")
+    barcode_aware_trim = bool(
+        (_module(config, "trimming").get("adapters") or {}).get("barcode_aware", False)
+    )
+    demux_runs = stage == "raw" and demux_enabled
     pools: dict[str, list[dict[str, str]]] = {}
     barcode_name_owners: dict[tuple[str, str], str] = {}
     barcode_sequence_owners: dict[tuple[str, str], tuple[str, str]] = {}
+    parsed_by_unit: dict[str, list[tuple[str, str]]] = {}
+
     for row in samples:
+        unit = unit_key(row)
         pool = row.get("pool_id", "")
         try:
             barcodes = parse_inline_barcodes(row.get("inline_barcodes", ""))
         except ValueError as exc:
-            errors.append(f"Sample unit {unit_key(row)}: {exc}")
+            errors.append(f"Sample unit {unit}: {exc}")
             barcodes = []
-        if (
-            stage == "raw"
-            and _enabled(config, "inline_barcode_demultiplexing")
-            and barcodes
-            and not pool
-        ):
-            errors.append(
-                f"Sample unit {unit_key(row)} has inline barcodes but no pool_id"
-            )
+        parsed_by_unit[unit] = barcodes
+
+        if demux_runs and barcodes and not pool:
+            errors.append(f"Sample unit {unit} has inline barcodes but no pool_id")
+        if not demux_runs:
+            if len(barcodes) > 1:
+                errors.append(
+                    f"Preprocessed unit {unit} must specify at most one Name=SEQUENCE in inline_barcodes"
+                )
+            elif (
+                (demux_enabled or barcode_aware_trim)
+                and row.get("library_type") == "ip"
+                and len(barcodes) != 1
+            ):
+                errors.append(
+                    f"Preprocessed IP unit {unit} requires one known Name=SEQUENCE in inline_barcodes"
+                )
+
         if pool:
             pools.setdefault(pool, []).append(row)
-        for name, sequence in barcodes:
-            owner_key = (pool, name)
-            if owner_key in barcode_name_owners and barcode_name_owners[
-                owner_key
-            ] != unit_key(row):
-                errors.append(
-                    f"Inline barcode {name} is assigned to multiple units in pool {pool}"
-                )
-            barcode_name_owners[owner_key] = unit_key(row)
-            sequence_key = (pool, sequence)
-            previous = barcode_sequence_owners.get(sequence_key)
-            assignment = (name, unit_key(row))
-            if previous is not None and previous != assignment:
-                errors.append(
-                    f"Inline barcode sequence {sequence} has multiple assignments in pool {pool}: "
-                    f"{previous[0]} ({previous[1]}) and {name} ({unit_key(row)})"
-                )
-            barcode_sequence_owners[sequence_key] = assignment
+        if pool:
+            for name, sequence in barcodes:
+                owner_key = (pool, name)
+                if owner_key in barcode_name_owners and barcode_name_owners[
+                    owner_key
+                ] != unit:
+                    errors.append(
+                        f"Inline barcode {name} is assigned to multiple units in pool {pool}"
+                    )
+                barcode_name_owners[owner_key] = unit
+                sequence_key = (pool, sequence)
+                previous = barcode_sequence_owners.get(sequence_key)
+                assignment = (name, unit)
+                if previous is not None and previous != assignment:
+                    errors.append(
+                        f"Inline barcode sequence {sequence} has multiple assignments in pool {pool}: "
+                        f"{previous[0]} ({previous[1]}) and {name} ({unit})"
+                    )
+                barcode_sequence_owners[sequence_key] = assignment
+
+    for sample, sample_rows in units_by_sample(samples).items():
+        has_bc = [bool(parsed_by_unit.get(unit_key(r))) for r in sample_rows]
+        if len(set(has_bc)) > 1:
+            errors.append(
+                f"Sample {sample} mixes barcoded and unbarcoded units; "
+                "every unit of a barcoded sample must specify inline_barcodes"
+            )
+
     for pool, rows in pools.items():
         signatures = {
             (
@@ -398,11 +512,7 @@ def _validate_eclip(
         }
         if len(signatures) != 1:
             errors.append(f"Rows in pool {pool} must repeat identical FASTQ/SRA inputs")
-        if (
-            len(rows) > 1
-            and stage == "raw"
-            and _enabled(config, "inline_barcode_demultiplexing")
-        ):
+        if len(rows) > 1 and demux_runs:
             if any(not row.get("inline_barcodes") for row in rows):
                 errors.append(
                     f"Every row in shared pool {pool} requires inline_barcodes"
@@ -416,6 +526,13 @@ def _validate_eclip(
             errors.append(f"modules.{module_name}.read must be R1, R2, or any")
         if str(settings.get("strand", "alignment")) not in {"alignment", "reverse"}:
             errors.append(f"modules.{module_name}.strand must be alignment or reverse")
+    if _enabled(config, "coverage"):
+        if _module(config, "coverage").get("strand_mode") != "separate":
+            errors.append("eCLIP modules.coverage requires strand_mode: separate")
+        if coverage_normalization_mode(config) not in {"CPM", "None"}:
+            errors.append(
+                "eCLIP modules.coverage supports normalize_using: CPM or None"
+            )
     if _enabled(config, "crosslink_sites") and str(
         _module(config, "crosslink_sites").get("end", "5prime")
     ) not in {"5prime", "3prime"}:
@@ -444,8 +561,28 @@ def validate_resolved_config(
     if aligner not in ALIGNMENT_TOOLS:
         errors.append(f"Unsupported modules.alignment.tool: {aligner}")
 
+    _validate_tool_extras(config, errors)
     _validate_adapters(config, samples, errors, warnings)
     _validate_eclip(config, samples, errors, warnings)
+
+    if assay != "eclip" and _enabled(config, "coverage"):
+        if _module(config, "coverage").get("strand_mode") == "separate":
+            errors.append(
+                f"Assay {assay} does not emit separate strand coverage files; "
+                "set modules.coverage.strand_mode to none, sample, forward, or reverse"
+            )
+
+    if _enabled(config, "bam_filter"):
+        min_mapq = _module(config, "bam_filter").get("min_mapq")
+        if min_mapq not in (None, ""):
+            try:
+                if int(min_mapq) > 60 and aligner in ALIGNMENT_TOOLS and aligner != "star":
+                    errors.append(
+                        f"modules.bam_filter.min_mapq={min_mapq} exceeds the MAPQ range of "
+                        f"aligner '{aligner}' (MAPQ 255 is STAR-specific)"
+                    )
+            except (TypeError, ValueError):
+                errors.append("modules.bam_filter.min_mapq must be an integer")
 
     active_tools = config.get("tools", {}) or {}
     missing_tools = [

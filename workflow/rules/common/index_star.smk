@@ -23,6 +23,7 @@ rule star_index:
         extra=lambda wildcards: tool_extra(config, "star", section="index")
     shell:
         """
+        set -euo pipefail
         mkdir -p {params.genome_dir} $(dirname {log})
         STAR --runMode genomeGenerate \
             --runThreadN {threads} \

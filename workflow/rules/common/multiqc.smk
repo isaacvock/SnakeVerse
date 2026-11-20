@@ -23,6 +23,7 @@ rule multiqc:
         extra=lambda wildcards: tool_extra(config, "multiqc")
     shell:
         """
+        set -euo pipefail
         mkdir -p {params.outdir} $(dirname {log})
         multiqc {params.search_dir} --outdir {params.outdir} --filename {params.filename} \
             {params.rendered} {params.extra} > {log} 2>&1

@@ -1,2 +1,3 @@
 sample_id	unit_id	fastq_1	fastq_2	condition	replicate	library_type	target	pool_id	input_sample_id	inline_barcodes	sra_id	sra_layout
-PRE_IP_1	L001	.test/generated/eclip/preextracted_R1.fastq.gz	.test/generated/eclip/preextracted_R2.fastq.gz	K562	1	ip	PUM2					
+PRE_IP_1	A01	.test/generated/eclip/preextracted_A01_R1.fastq.gz	.test/generated/eclip/preextracted_A01_R2.fastq.gz	K562	1	ip	PUM2			A01=AAGCAAT		
+PRE_IP_1	B06	.test/generated/eclip/preextracted_B06_R1.fastq.gz	.test/generated/eclip/preextracted_B06_R2.fastq.gz	K562	1	ip	PUM2			B06=GGCTTGT		

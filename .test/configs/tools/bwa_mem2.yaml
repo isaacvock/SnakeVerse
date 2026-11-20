@@ -6,5 +6,7 @@ params:
   align:
     mark_shorter_splits: false
 
-extra: ""
+extra:
+  index: ""
+  align: ""
 

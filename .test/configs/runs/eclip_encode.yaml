@@ -23,14 +23,25 @@ modules:
   trimming:
     enabled: true
     tool: cutadapt
-    adapters: {mode: none, read1: null, read2: null}
-    params: {quality_cutoff: "0,0", minimum_length: 20, times: 1}
+    adapters:
+      mode: sequences
+      barcode_aware: true
+      read1: AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC
+      read2: AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT
+    params: {quality_cutoff: 6, minimum_length: 18, minimum_overlap: 5, times: 2}
   alignment:
     enabled: true
     tool: star
     transcriptome_bam: false
     params:
-      align: {outFilterMultimapNmax: 1, alignEndsType: EndToEnd, quantMode: ""}
+      align:
+        outFilterMultimapNmax: 1
+        alignEndsType: EndToEnd
+        outFilterMismatchNoverReadLmax: 1.0
+        outFilterMismatchNoverLmax: 0.3
+        outFilterMismatchNmax: 10
+        outFilterScoreMin: 10
+        quantMode: ""
   mark_duplicates: {enabled: false}
   bam_filter:
     enabled: true
@@ -41,8 +52,8 @@ modules:
     exclude_contigs: []
   umi_deduplication:
     enabled: true
-    method: directional
-    edit_distance: 1
+    method: unique
+    edit_distance: 0
     strand_aware: true
     spliced_is_unique: true
     umi_tag: RX
@@ -52,10 +63,10 @@ modules:
     enabled: true
     strand_mode: separate
     read: R2
-    strand: reverse
+    strand: alignment
     params: {bin_size: 10, normalize_using: CPM, min_mapping_quality: 10}
-  crosslink_sites: {enabled: true, read: R2, end: 5prime, strand: reverse, min_mapping_quality: 10}
-  enrichment: {enabled: true, read: R2, strand: reverse, bin_size: 50, pseudocount: 1, min_mapping_quality: 10}
+  crosslink_sites: {enabled: true, read: R2, end: 5prime, strand: alignment, min_mapping_quality: 10}
+  enrichment: {enabled: true, read: R2, strand: alignment, bin_size: 50, pseudocount: 1, min_mapping_quality: 10}
   multiqc: {enabled: true}
 
 resources:

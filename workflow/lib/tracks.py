@@ -5,13 +5,9 @@ from typing import Any
 from samples import sample_strandedness
 
 
-def coverage_bam_for_sample(config: dict[str, Any], results_dir: str, sample: str) -> str:
-    if config.get("modules", {}).get("bam_filter", {}).get("enabled", False):
-        return f"{results_dir}/bam/filtered/{sample}.bam"
-    return f"{results_dir}/bam/raw/{sample}.bam"
-
-
-def coverage_strand_arg(config: dict[str, Any], samples: list[dict[str, str]], sample: str) -> str:
+def coverage_strand_arg(
+    config: dict[str, Any], samples: list[dict[str, str]], sample: str
+) -> str:
     coverage = config.get("modules", {}).get("coverage", {}) or {}
     mode = coverage.get("strand_mode", "none")
     if config.get("assay") != "rnaseq" or mode in ("none", None, False):

@@ -16,4 +16,6 @@ params:
     outSAMattributes: "NH HI AS NM MD"
     quantMode: "GeneCounts TranscriptomeSAM"
 
-extra: ""
+extra:
+  index: ""
+  align: ""

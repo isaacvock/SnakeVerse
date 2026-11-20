@@ -43,11 +43,13 @@ modules:
     tool: cutadapt
     adapters:
       mode: sequences
+      barcode_aware: true
       read1: AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC
       read2: AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT
     params:
-      quality_cutoff: "20,20"
-      minimum_length: 20
+      quality_cutoff: 6
+      minimum_length: 18
+      minimum_overlap: 5
       times: 2
 
   alignment:
@@ -58,6 +60,10 @@ modules:
       align:
         outFilterMultimapNmax: 1
         alignEndsType: EndToEnd
+        outFilterMismatchNoverReadLmax: 1.0
+        outFilterMismatchNoverLmax: 0.3
+        outFilterMismatchNmax: 10
+        outFilterScoreMin: 10
         quantMode: ""
 
   mark_duplicates:
@@ -73,8 +79,8 @@ modules:
 
   umi_deduplication:
     enabled: true
-    method: directional
-    edit_distance: 1
+    method: unique
+    edit_distance: 0
     strand_aware: true
     spliced_is_unique: true
     umi_tag: RX
@@ -87,7 +93,7 @@ modules:
     enabled: true
     strand_mode: separate
     read: R2
-    strand: reverse
+    strand: alignment
     params:
       bin_size: 10
       normalize_using: CPM
@@ -99,13 +105,13 @@ modules:
     enabled: true
     read: R2
     end: 5prime
-    strand: reverse
+    strand: alignment
     min_mapping_quality: 10
 
   enrichment:
     enabled: true
     read: R2
-    strand: reverse
+    strand: alignment
     bin_size: 50
     pseudocount: 1
     min_mapping_quality: 10

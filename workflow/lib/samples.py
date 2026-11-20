@@ -255,6 +255,26 @@ def demultiplexing_active(config: dict[str, Any]) -> bool:
     return input_stage(config) == "raw" and bool(module.get("enabled", False))
 
 
+def unit_has_inline_barcodes(samples: list[dict[str, str]], unit: str) -> bool:
+    row = sample_by_unit(samples, unit)
+    return bool(parse_inline_barcodes(row.get("inline_barcodes", "")))
+
+
+def sample_has_inline_barcodes(samples: list[dict[str, str]], sample: str) -> bool:
+    return any(
+        bool(parse_inline_barcodes(row.get("inline_barcodes", "")))
+        for row in units_by_sample(samples)[sample]
+    )
+
+
+def barcode_stamping_active(
+    config: dict[str, Any], samples: list[dict[str, str]]
+) -> bool:
+    return not demultiplexing_active(config) and any(
+        bool(parse_inline_barcodes(row.get("inline_barcodes", ""))) for row in samples
+    )
+
+
 def umi_extraction_active(config: dict[str, Any]) -> bool:
     module = (config.get("modules", {}) or {}).get("umi_extraction", {}) or {}
     return input_stage(config) != "umi_extracted" and bool(module.get("enabled", False))
@@ -262,6 +282,10 @@ def umi_extraction_active(config: dict[str, Any]) -> bool:
 
 def demultiplexed_fastq_path(results_dir: str, unit: str, read: str) -> str:
     return f"{results_dir}/fastq/demultiplexed/{unit}_{read}.fastq.gz"
+
+
+def barcode_stamped_fastq_path(results_dir: str, unit: str, read: str) -> str:
+    return f"{results_dir}/fastq/barcode_stamped/{unit}_{read}.fastq.gz"
 
 
 def umi_extracted_fastq_path(results_dir: str, unit: str, read: str) -> str:
@@ -276,10 +300,10 @@ def preprocessing_fastq_for_read(
     results_dir: str,
 ) -> str:
     row = sample_by_unit(samples, unit)
-    if demultiplexing_active(config) and parse_inline_barcodes(
-        row.get("inline_barcodes", "")
-    ):
-        return demultiplexed_fastq_path(results_dir, unit, read)
+    if parse_inline_barcodes(row.get("inline_barcodes", "")):
+        if demultiplexing_active(config):
+            return demultiplexed_fastq_path(results_dir, unit, read)
+        return barcode_stamped_fastq_path(results_dir, unit, read)
     return fastq_for_read(samples, unit, read, results_dir)
 
 
@@ -684,22 +708,27 @@ def as_space(values: Any) -> str:
 
 
 def bowtie2_reads_arg(r1: Any, r2: Any) -> str:
-    if r2:
+    if r1 and r2:
         return f"-1 {as_csv(r1)} -2 {as_csv(r2)}"
+    if r2:
+        return f"-U {as_csv(r2)}"
     return f"-U {as_csv(r1)}"
 
 
 def star_reads_arg(r1: Any, r2: Any) -> str:
-    if r2:
+    if r1 and r2:
         return f"{as_csv(r1)} {as_csv(r2)}"
+    if r2:
+        return as_csv(r2)
     return as_csv(r1)
 
 
 def bwa_mem2_reads_arg(r1: Any, r2: Any) -> str:
-    r1_files = as_space(r1)
+    if r1 and r2:
+        return f"<(gzip -cdf {as_space(r1)}) <(gzip -cdf {as_space(r2)})"
     if r2:
-        return f"<(gzip -cdf {r1_files}) <(gzip -cdf {as_space(r2)})"
-    return f"<(gzip -cdf {r1_files})"
+        return f"<(gzip -cdf {as_space(r2)})"
+    return f"<(gzip -cdf {as_space(r1)})"
 
 
 def featurecounts_paired_end(

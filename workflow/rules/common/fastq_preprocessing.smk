@@ -1,11 +1,18 @@
-from clip import barcode_adapter_args, demultiplexed_barcode_files, umi_extract_args
+from clip import (
+    barcode_adapter_args,
+    demultiplexed_barcode_entries,
+    single_unit_barcode_entry,
+    umi_extract_args,
+)
 from params import module_tool_extra, resource_value
 from samples import (
+    barcode_stamping_active,
+    fastq_for_read,
+    optional_fastq_for_read,
     optional_preprocessing_fastq_for_read,
     pool_fastq_for_read,
     pool_source_row,
     preprocessing_fastq_for_read,
-    processed_unit_layout,
     row_is_paired,
     sample_by_unit,
     unit_layout,
@@ -37,7 +44,7 @@ if demultiplexing_active(config):
             paired=lambda wildcards: row_is_paired(pool_source_row(SAMPLES, wildcards.pool)),
             adapters=lambda wildcards: barcode_adapter_args(config, SAMPLES, wildcards.pool),
             extra=lambda wildcards: module_tool_extra(
-                config, "inline_barcode_demultiplexing", "cutadapt"
+                config, "inline_barcode_demultiplexing", "cutadapt", section="demultiplex"
             )
         shell:
             r"""
@@ -66,23 +73,74 @@ if demultiplexing_active(config):
             r2=temp(f"{RESULTS_DIR}/fastq/demultiplexed/{{unit}}_R2.fastq.gz")
         log:
             f"{RESULTS_DIR}/logs/cutadapt/merge.{{unit}}.log"
+        threads: 1
+        resources:
+            mem_mb=int(resource_value(config, "cutadapt_demultiplex", "mem_mb", 2048)),
+            runtime_min=int(resource_value(config, "cutadapt_demultiplex", "runtime_min", 60))
+        conda:
+            workflow_file("envs/cutadapt.yaml")
         params:
-            r1=lambda wildcards: demultiplexed_barcode_files(
+            script=lambda wildcards: workflow_file("scripts/stamp_fastq_barcodes.py"),
+            r1_entries=lambda wildcards: demultiplexed_barcode_entries(
                 RESULTS_DIR, SAMPLES, wildcards.unit, "R1"
             ),
-            r2=lambda wildcards: demultiplexed_barcode_files(
+            r2_entries=lambda wildcards: demultiplexed_barcode_entries(
                 RESULTS_DIR, SAMPLES, wildcards.unit, "R2"
             ),
             paired=lambda wildcards: unit_layout(SAMPLES, wildcards.unit) == "paired"
         shell:
             """
             set -euo pipefail
-            mkdir -p $(dirname {output.r1}) $(dirname {log})
-            cat {params.r1} > {output.r1} 2> {log}
+            mkdir -p $(dirname {output.r1:q}) $(dirname {log:q})
+            python {params.script:q} {params.r1_entries} --output {output.r1:q} > {log:q} 2>&1
             if [ "{params.paired}" = "True" ]; then
-                cat {params.r2} > {output.r2} 2>> {log}
+                python {params.script:q} {params.r2_entries} --output {output.r2:q} >> {log:q} 2>&1
             else
-                gzip -c /dev/null > {output.r2}
+                gzip -c /dev/null > {output.r2:q}
+            fi
+            """
+
+
+if barcode_stamping_active(config, SAMPLES):
+    rule stamp_inline_barcode:
+        input:
+            r1=lambda wildcards: fastq_for_read(
+                SAMPLES, wildcards.unit, "R1", RESULTS_DIR
+            ),
+            r2=lambda wildcards: optional_fastq_for_read(
+                SAMPLES, wildcards.unit, "R2", RESULTS_DIR
+            )
+        output:
+            r1=temp(f"{RESULTS_DIR}/fastq/barcode_stamped/{{unit}}_R1.fastq.gz"),
+            r2=temp(f"{RESULTS_DIR}/fastq/barcode_stamped/{{unit}}_R2.fastq.gz")
+        log:
+            f"{RESULTS_DIR}/logs/cutadapt/stamp_barcode.{{unit}}.log"
+        threads: 1
+        resources:
+            mem_mb=int(resource_value(config, "cutadapt_demultiplex", "mem_mb", 2048)),
+            runtime_min=int(resource_value(config, "cutadapt_demultiplex", "runtime_min", 60))
+        conda:
+            workflow_file("envs/cutadapt.yaml")
+        params:
+            script=lambda wildcards: workflow_file("scripts/stamp_fastq_barcodes.py"),
+            r1_entry=lambda wildcards, input: single_unit_barcode_entry(
+                SAMPLES, wildcards.unit, str(input.r1)
+            ),
+            r2_entry=lambda wildcards, input: (
+                single_unit_barcode_entry(SAMPLES, wildcards.unit, str(input.r2[0]))
+                if input.r2
+                else ""
+            ),
+            paired=lambda wildcards: unit_layout(SAMPLES, wildcards.unit) == "paired"
+        shell:
+            """
+            set -euo pipefail
+            mkdir -p $(dirname {output.r1:q}) $(dirname {log:q})
+            python {params.script:q} {params.r1_entry} --output {output.r1:q} > {log:q} 2>&1
+            if [ "{params.paired}" = "True" ]; then
+                python {params.script:q} {params.r2_entry} --output {output.r2:q} >> {log:q} 2>&1
+            else
+                gzip -c /dev/null > {output.r2:q}
             fi
             """
 
@@ -116,7 +174,9 @@ if umi_extraction_active(config):
             rendered=lambda wildcards: umi_extract_args(
                 config, unit_layout(SAMPLES, wildcards.unit) == "paired"
             ),
-            extra=lambda wildcards: module_tool_extra(config, "umi_extraction", "umi_tools")
+            extra=lambda wildcards: module_tool_extra(
+                config, "umi_extraction", "umi_tools", section="extract"
+            )
         shell:
             """
             set -euo pipefail

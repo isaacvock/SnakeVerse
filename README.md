@@ -281,8 +281,9 @@ extra:
 
 Prefer documented `params` entries when available. `extra` is deliberately an
 escape hatch: SnakeVerse appends it verbatim and cannot validate the flags.
-RSEM, STAR, Bowtie2, BWA-MEM2, samtools, and SRA Toolkit profiles label their
-command stages explicitly where needed.
+RSEM, STAR, Bowtie2, BWA-MEM2, samtools, SRA Toolkit, Cutadapt, and UMI-tools
+profiles label their command stages explicitly and reject non-empty scalar
+`extra` values so flags cannot leak across stages.
 
 Module-local `params` and `extra` overlay the selected base tool profile for
 that module. This lets a recipe request, for example, unique-only STAR mapping
@@ -300,7 +301,7 @@ The eCLIP sheet uses one row per sample and technical unit:
 
 ```text
 sample_id  unit_id  fastq_1  fastq_2  condition  replicate  library_type  target  pool_id  input_sample_id  inline_barcodes
-PUM2_IP_1  L001     pool_R1  pool_R2  K562       1          ip            PUM2    pool_1   PUM2_SMI_1       A01=ATTGCTT,B06=ACAAGCC
+PUM2_IP_1  L001     pool_R1  pool_R2  K562       1          ip            PUM2    pool_1   PUM2_SMI_1       A01=AAGCAAT,B06=GGCTTGT
 PUM2_SMI_1 L001     input_R1 input_R2 K562       1          sm_input      PUM2
 TAG_1      L001     tag_R1   tag_R2   K562       1          tag_control   tag
 ```
@@ -308,12 +309,20 @@ TAG_1      L001     tag_R1   tag_R2   K562       1          tag_control   tag
 - `library_type` is `ip`, `sm_input`, or `tag_control`.
 - An IP links directly to its size-matched input with `input_sample_id`.
   Tag-only controls are processed normally but are never accepted as SMInputs.
-- `inline_barcodes` is a comma-separated `Name=SEQUENCE` list. Multiple names
-  on one row are merged into that sample unit.
+- `inline_barcodes` is a comma-separated `Name=SEQUENCE` list in the sequenced
+  orientation (5' R1 for ENCODE eCLIP, e.g., `A01=AAGCAAT,B06=GGCTTGT`).
+  Multiple names on one raw-stage row are merged into that sample unit after
+  stamping barcode metadata (`BC:Z:<sequence>` in BAMs, `|BC=<name>` in QNAMEs)
+  for barcode-aware UMI deduplication (`--per-cell --cell-tag=BC`).
+- For `demultiplexed` or `umi_extracted` inputs from barcoded protocols, supply
+  one row per demultiplexed barcode unit with its single `Name=SEQUENCE`
+  assignment so barcode identity is stamped before alignment and deduplication.
 - Rows sharing a physical pool repeat the same FASTQ paths and `pool_id`.
   SnakeVerse validates those paths and runs Cutadapt once for the pool.
 - Biological replicates retain distinct `sample_id` values. Technical units
   sharing a sample ID are merged only at alignment.
+- SRA-backed eCLIP rows must explicitly declare `sra_layout` (`single` or
+  `paired`).
 
 ### Starting stage and UMI layout
 
@@ -324,11 +333,12 @@ preprocessing:
   input_stage: raw  # raw | demultiplexed | umi_extracted
 ```
 
-`demultiplexed` bypasses inline-barcode processing. `umi_extracted` also
-bypasses UMI-tools extraction and assumes the UMI is already in the read name.
-The default QNAME form is UMI-tools' final `_<UMI>` suffix; set
-`modules.umi_deduplication.qname_regex` with a named `(?P<umi>...)` group for
-another convention.
+`demultiplexed` bypasses inline-barcode splitting while still stamping declared
+unit barcodes. `umi_extracted` also bypasses UMI-tools extraction and assumes
+the UMI is already in the read name. The default QNAME form is UMI-tools' final
+`_<UMI>` suffix; set `modules.umi_deduplication.qname_regex` with a named
+`(?P<umi>...)` group for another convention (for example,
+`"^(?P<umi>[ACGTN]+):"` for ENCODE DCC pre-extracted FASTQs).
 
 Friendly UMI definitions are run-level and reusable:
 
@@ -345,13 +355,15 @@ modules:
 ```
 
 An `umi_only` R2 contributes its UMI but is omitted from alignment, converting
-raw paired ecCLIP input into single-end R1 alignment. Conventional eCLIP uses a
-5-nt R2 UMI with `role: biological`, so both mates remain aligned.
+raw paired ecCLIP input into single-end R1 alignment (`role: umi_only` on R1
+likewise converts paired input into single-end R2 alignment). Conventional
+eCLIP uses a 5-nt R2 UMI with `role: biological` (`method: unique`
+deduplication), whereas ecCLIP uses an 8-nt UMI with `method: directional`.
 
-The supplied ecCLIP recipe follows the paper's R1 clipping, poly(A) trimming,
-quality, and minimum-length policy, but deliberately uses SnakeVerse's existing
-STAR alignment path rather than BWA-aln. Both supplied recipes retain unique
-primary alignments.
+The supplied ecCLIP recipe follows the paper's 5' 3-nt R1 clipping, Cutadapt
+`--poly-a` tail trimming, quality, and minimum-length policy, while
+deliberately using SnakeVerse's STAR alignment path rather than BWA-aln. Both
+supplied recipes retain unique primary alignments (`outFilterMultimapNmax: 1`).
 
 ### CLIP outputs
 
@@ -359,10 +371,10 @@ For each library, the recipes retain:
 
 ```text
 bam/raw/<sample>.bam
-bam/pre_dedup/<sample>.bam          RX-tagged, before UMI deduplication
+bam/pre_dedup/<sample>.bam          UMI/BC-tagged, before UMI deduplication
 bam/umi_dedup/<sample>.bam
 tracks/read_coverage/<sample>.<plus|minus>.bw
-tracks/crosslink_sites/<sample>.<plus|minus>.bw
+tracks/crosslink_sites/<sample>.<plus|minus>.bw   (enabled by default for eCLIP; disabled for ecCLIP)
 ```
 
 Processing reports remain under `qc/`: per-pool Cutadapt demultiplexing JSON,
@@ -375,14 +387,18 @@ UMI-tools groups by strand as part of its coordinate semantics; consequently
 `modules.umi_deduplication.strand_aware` must remain `true`. Splice-aware
 grouping is enabled by default and can be changed with `spliced_is_unique`.
 
-Read coverage defaults to 10-bp CPM. Crosslink tracks are unsmoothed 1-bp raw
-counts: conventional eCLIP uses the reverse-interpreted mapped 5' end of R2,
-while ecCLIP uses the mapped 5' end of R1 on its alignment strand.
+Read coverage defaults to 10-bp CPM scaled against the library's combined
+plus+minus representative read count so strand asymmetry does not distort CPM.
+Crosslink tracks are unsmoothed 1-bp raw counts: conventional eCLIP uses the
+mapped 5' end of sense R2 (`strand: alignment`), whereas `crosslink_sites` is
+disabled by default in the ecCLIP recipe because template-switching RT reads
+through many crosslink sites.
 
 An IP with a valid SMInput link additionally receives 50-bp, library-size
-scaled log2 enrichment tracks under `tracks/enrichment/`. The default symmetric
-pseudocount is 1, and bins where both inputs are zero are omitted. An IP without
-an SMInput is valid and produces a warning; enrichment is simply skipped.
+scaled log2 enrichment tracks under `tracks/enrichment/` using strand-combined
+representative library counts. The default symmetric pseudocount is 1, and bins
+where both inputs are zero are omitted. An IP without an SMInput is valid and
+produces a warning; enrichment is simply skipped.
 
 ## Adapter Trimming
 

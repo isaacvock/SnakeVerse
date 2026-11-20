@@ -39,11 +39,12 @@ modules:
     enabled: true
     tool: cutadapt
     adapters:
-      mode: sequences
-      read1: "A{18}"
+      mode: none
+      read1:
       read2:
     params:
       cut_r1: 3
+      poly_a: true
       quality_cutoff: 15
       minimum_length: 20
       times: 1
@@ -56,6 +57,10 @@ modules:
       align:
         outFilterMultimapNmax: 1
         alignEndsType: EndToEnd
+        outFilterMismatchNoverReadLmax: 1.0
+        outFilterMismatchNoverLmax: 0.3
+        outFilterMismatchNmax: 10
+        outFilterScoreMin: 10
         quantMode: ""
 
   mark_duplicates:
@@ -93,8 +98,11 @@ modules:
       ignore_duplicates: false
       extend_reads: false
 
+  # Disabled by default for ecCLIP because MMLV-family template-switching RT
+  # reads through many crosslinks (encoding single-nt crosslinks via internal
+  # deletions rather than 5' RT stops).
   crosslink_sites:
-    enabled: true
+    enabled: false
     read: R1
     end: 5prime
     strand: alignment
