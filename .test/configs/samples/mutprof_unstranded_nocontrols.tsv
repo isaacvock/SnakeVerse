@@ -1,0 +1,2 @@
+sample_id	unit_id	fastq_1	fastq_2	condition	replicate	strandedness	library_type	target
+UNSTR_RBP_1	L001	.test/generated/mutprof/unstr_rbp_R1.fastq.gz		K562	1	unstranded	treated	ADAR_RBP

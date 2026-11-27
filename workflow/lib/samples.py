@@ -32,6 +32,15 @@ ECLIP_REQUIRED_COLUMNS = [
     "library_type",
     "target",
 ]
+MUTATIONAL_PROFILING_REQUIRED_COLUMNS = [
+    "sample_id",
+    "unit_id",
+    "fastq_1",
+    "condition",
+    "replicate",
+    "strandedness",
+    "library_type",
+]
 
 
 def required_columns_for_assay(assay: str) -> list[str]:
@@ -41,6 +50,8 @@ def required_columns_for_assay(assay: str) -> list[str]:
         return ATACSEQ_REQUIRED_COLUMNS
     if assay == "eclip":
         return ECLIP_REQUIRED_COLUMNS
+    if assay == "mutational_profiling":
+        return MUTATIONAL_PROFILING_REQUIRED_COLUMNS
     return GENERIC_REQUIRED_COLUMNS
 
 
@@ -83,6 +94,13 @@ def load_samples(
             row.setdefault("pool_id", "")
             row.setdefault("inline_barcodes", "")
             row.setdefault("input_sample_id", "")
+            row.setdefault("library_type", "")
+            row.setdefault("target", "")
+            if (
+                assay == "mutational_profiling"
+                and row["library_type"].lower() == "negative control"
+            ):
+                row["library_type"] = "negative_control"
 
     seen_units: set[str] = set()
     for row in rows:

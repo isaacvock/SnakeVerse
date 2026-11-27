@@ -1,0 +1,9 @@
+sample_id	unit_id	fastq_1	fastq_2	condition	replicate	strandedness	library_type	target	sra_id	sra_layout
+RBP_rep1	L001	fastq/RBP_rep1_R1.fastq.gz	fastq/RBP_rep1_R2.fastq.gz	K562	1	reverse	treated	RBP		
+RBP_rep2	L001	fastq/RBP_rep2_R1.fastq.gz	fastq/RBP_rep2_R2.fastq.gz	K562	2	reverse	treated	RBP		
+CTRL_rep1	L001	fastq/CTRL_rep1_R1.fastq.gz	fastq/CTRL_rep1_R2.fastq.gz	K562	1	reverse	negative_control	control		
+CTRL_rep2	L001	fastq/CTRL_rep2_R1.fastq.gz	fastq/CTRL_rep2_R2.fastq.gz	K562	2	reverse	negative_control	control		
+# strandedness: forward, reverse, or unstranded (unstranded emits +-reference strand counts with strand='.').
+# library_type: treated or negative_control. All negative_control BAMs are pooled when anomaly_calling.mode is auto or controls.
+# If your experiment has no negative controls, omit negative_control rows; mode: auto falls back to mutation-type-aware anomaly calling on treated BAMs.
+# For single-end data, leave fastq_2 blank. For SRA downloads, set sra_id and sra_layout (single or paired) and leave fastq_1/fastq_2 blank.

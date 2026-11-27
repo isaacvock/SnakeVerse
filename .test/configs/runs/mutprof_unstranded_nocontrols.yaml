@@ -1,0 +1,75 @@
+schema_version: 2
+created_from: {recipe: hypertribe, version: 1}
+project: {name: snakeverse_ci, run_name: mutprof_unstranded_nocontrols}
+assay: mutational_profiling
+samples: .test/configs/samples/mutprof_unstranded_nocontrols.tsv
+reference: .test/configs/references/mutprof_test_genome.yaml
+results_dir: .test/results/mutprof_unstranded_nocontrols
+preprocessing: {input_stage: raw}
+
+modules:
+  fastq_qc: {enabled: false}
+  umi_extraction: {enabled: false}
+  trimming:
+    enabled: true
+    tool: fastp
+    adapters: {mode: none}
+  alignment:
+    enabled: true
+    tool: star
+    transcriptome_bam: false
+    params:
+      align:
+        outFilterMultimapNmax: 1
+        outFilterMismatchNoverReadLmax: 0.12
+        alignEndsType: EndToEnd
+        outSAMattributes: "NH HI AS NM MD"
+  mark_duplicates: {enabled: true}
+  bam_filter:
+    enabled: true
+    min_mapq: 10
+    excluded_flags: 3852
+    keep_duplicates: false
+    exclude_contigs: []
+  umi_deduplication: {enabled: false}
+  bam_qc: {enabled: true}
+  gene_counts: {enabled: false}
+  salmon_quantification: {enabled: false}
+  rsem_quantification: {enabled: false}
+  coverage: {enabled: false}
+  anomaly_calling:
+    enabled: true
+    mode: auto
+    min_base_quality: 30
+    min_depth: 5
+    min_alt: 3
+    min_freq: 0.25
+    target_min_freq: 0.90
+    err_rate: 0.002
+    p_cutoff: 0.0001
+  mutation_counts:
+    enabled: true
+    mut_types: [AG]
+    min_base_quality: 30
+    min_end_distance: 5
+    indel_flank: 3
+    min_depth: 1
+  editing_tracks:
+    enabled: true
+    min_depth: 5
+    min_edit_count: 1
+    emit_bedgraph: false
+  multiqc: {enabled: false}
+
+resources:
+  fastp: {threads: 1, mem_mb: 512, runtime_min: 15}
+  star: {threads: 2, mem_mb: 2048, runtime_min: 60}
+  star_index: {threads: 2, mem_mb: 2048, runtime_min: 60}
+  samtools_markdup: {threads: 1, mem_mb: 512, runtime_min: 15}
+  samtools_filter: {threads: 1, mem_mb: 512, runtime_min: 15}
+  samtools_qc: {threads: 1, mem_mb: 512, runtime_min: 15}
+  samtools_faidx: {threads: 1, mem_mb: 512, runtime_min: 15}
+  samtools_qname_sort: {threads: 1, mem_mb: 512, runtime_min: 15}
+  anomaly_calling: {threads: 2, mem_mb: 1024, runtime_min: 30}
+  mutation_counts: {threads: 2, mem_mb: 1024, runtime_min: 30}
+  editing_tracks: {threads: 1, mem_mb: 512, runtime_min: 15}

@@ -10,7 +10,10 @@ def coverage_strand_arg(
 ) -> str:
     coverage = config.get("modules", {}).get("coverage", {}) or {}
     mode = coverage.get("strand_mode", "none")
-    if config.get("assay") != "rnaseq" or mode in ("none", None, False):
+    if (
+        config.get("assay") not in {"rnaseq", "mutational_profiling"}
+        or mode in ("none", None, False)
+    ):
         return ""
     if mode == "sample":
         strandedness = sample_strandedness(samples, sample)

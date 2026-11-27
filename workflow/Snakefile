@@ -35,6 +35,7 @@ WORKFLOW_LIB_MODULES = [
     ("snakeverse_config", "lib/config.py"),
     ("samples", "lib/samples.py"),
     ("clip", "lib/clip.py"),
+    ("mutprof", "lib/mutprof.py"),
     ("refs", "lib/refs.py"),
     ("params", "lib/params.py"),
     ("tracks", "lib/tracks.py"),
@@ -212,5 +213,7 @@ elif config["assay"] == "atacseq":
     include: workflow_file("rules/assays/atacseq.smk")
 elif config["assay"] == "eclip":
     include: workflow_file("rules/assays/eclip.smk")
+elif config["assay"] == "mutational_profiling":
+    include: workflow_file("rules/assays/mutational_profiling.smk")
 else:
     raise ValueError(f"Unsupported assay: {config['assay']}")

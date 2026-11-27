@@ -1,0 +1,4 @@
+sample_id	unit_id	fastq_1	fastq_2	condition	replicate	strandedness	library_type	target
+RBP_1	L001	.test/generated/mutprof/rbp1_R1.fastq.gz	.test/generated/mutprof/rbp1_R2.fastq.gz	K562	1	reverse	treated	TDP43
+CTRL_1	L001	.test/generated/mutprof/ctrl1_R1.fastq.gz	.test/generated/mutprof/ctrl1_R2.fastq.gz	K562	1	reverse	negative_control	IgG
+CTRL_2	L001	.test/generated/mutprof/ctrl2_R1.fastq.gz	.test/generated/mutprof/ctrl2_R2.fastq.gz	K562	2	reverse	negative_control	IgG

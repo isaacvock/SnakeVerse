@@ -1,0 +1,13 @@
+reference:
+  name: mutprof_test
+  fasta: .test/generated/mutprof/genome.fasta
+  gtf: .test/generated/mutprof/genome.gtf
+  chrom_sizes: .test/generated/mutprof/genome.chrom.sizes
+  blacklist:
+  tss_bed:
+  indexes:
+    bowtie2:
+    star: .test/results/mutprof_reference/star_index
+    bwa_mem2:
+  effective_genome_size: 200000
+  macs3_genome_size: 200000

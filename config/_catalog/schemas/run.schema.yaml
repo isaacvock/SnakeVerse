@@ -19,7 +19,7 @@ properties:
     type: object
     required: [name, run_name]
   assay:
-    enum: [generic, rnaseq, atacseq, eclip]
+    enum: [generic, rnaseq, atacseq, eclip, mutational_profiling]
   preprocessing:
     type: object
     properties:

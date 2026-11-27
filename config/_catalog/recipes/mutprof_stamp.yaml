@@ -1,0 +1,154 @@
+# APOBEC1-based RBP mutational profiling recipe (STAMP / DART-seq; C-to-U -> CT).
+schema_version: 2
+
+created_from:
+  recipe: stamp
+  version: 1
+
+project:
+  name: example_project
+  run_name: "{{RUN_NAME}}"
+
+assay: mutational_profiling
+samples: config/samples/{{RUN_NAME}}.tsv
+reference: config/references/{{GENOME}}.yaml
+results_dir: results/{{RUN_NAME}}
+
+preprocessing:
+  input_stage: raw
+
+modules:
+  fastq_qc:
+    enabled: true
+
+  # Enable umi_extraction + umi_deduplication (and set mark_duplicates.enabled: false)
+  # if your STAMP library uses inline UMIs.
+  umi_extraction:
+    enabled: false
+    method: string
+    read1:
+      role: biological
+    read2:
+      role: biological
+
+  trimming:
+    enabled: true
+    tool: fastp
+    # REQUIRED REVIEW: choose auto, sequences, or none.
+    adapters:
+      mode: auto
+      read1:
+      read2:
+
+  alignment:
+    enabled: true
+    tool: star
+    transcriptome_bam: false
+    params:
+      align:
+        # Relaxed mismatch budget so multi-edited STAMP reads map cleanly.
+        outFilterMismatchNoverReadLmax: 0.08
+        alignEndsType: EndToEnd
+        outSAMattributes: "NH HI AS NM MD"
+
+  mark_duplicates:
+    enabled: true
+
+  bam_filter:
+    enabled: true
+    min_mapq: 10
+    required_flags:
+    excluded_flags: 3852
+    keep_duplicates: false
+    exclude_contigs: []
+
+  umi_deduplication:
+    enabled: false
+    method: directional
+    edit_distance: 1
+    strand_aware: true
+    spliced_is_unique: true
+    umi_tag: RX
+    qname_regex: "_(?P<umi>[ACGTN]+)$"
+
+  bam_qc:
+    enabled: true
+
+  gene_counts:
+    enabled: true
+    tool: featurecounts
+    modes:
+      standard: true
+      exon_strict: false
+      full_gene: false
+    feature_type: exon
+    attribute_type: gene_id
+    strandedness: sample
+    paired_end: auto
+    count_read_pairs: auto
+    require_both_ends_mapped: false
+    count_multimapping_reads: false
+    count_overlapping_features: false
+
+  salmon_quantification:
+    enabled: false
+    gene_results: true
+    isoform_results: true
+
+  rsem_quantification:
+    enabled: false
+    gene_results: true
+    isoform_results: true
+
+  coverage:
+    enabled: true
+    strand_mode: none
+
+  anomaly_calling:
+    enabled: true
+    mode: auto
+    min_base_quality: 30
+    min_depth: 5
+    min_alt: 3
+    min_freq: 0.25
+    target_min_freq: 0.90
+    err_rate: 0.002
+    p_cutoff: 0.0001
+
+  mutation_counts:
+    enabled: true
+    mut_types: [CT]
+    min_base_quality: 30
+    min_end_distance: 5
+    indel_flank: 3
+    min_depth: 1
+
+  editing_tracks:
+    enabled: true
+    min_depth: 5
+    min_edit_count: 1
+    emit_bedgraph: false
+
+  multiqc:
+    enabled: true
+
+resources:
+  fastqc: {threads: 1, mem_mb: 1024, runtime_min: 30}
+  sra_tools: {threads: 4, mem_mb: 4096, runtime_min: 240}
+  fastp: {threads: 4, mem_mb: 4096, runtime_min: 120}
+  star: {threads: 12, mem_mb: 32000, runtime_min: 360}
+  star_index: {threads: 8, mem_mb: 32000, runtime_min: 480}
+  samtools_markdup: {threads: 4, mem_mb: 4096, runtime_min: 120}
+  samtools_filter: {threads: 4, mem_mb: 4096, runtime_min: 120}
+  samtools_qc: {threads: 2, mem_mb: 2048, runtime_min: 60}
+  samtools_faidx: {threads: 1, mem_mb: 2048, runtime_min: 30}
+  samtools_qname_sort: {threads: 4, mem_mb: 8192, runtime_min: 120}
+  anomaly_calling: {threads: 4, mem_mb: 8192, runtime_min: 180}
+  mutation_counts: {threads: 4, mem_mb: 8192, runtime_min: 240}
+  editing_tracks: {threads: 1, mem_mb: 4096, runtime_min: 60}
+  featurecounts: {threads: 8, mem_mb: 8192, runtime_min: 180}
+  salmon: {threads: 8, mem_mb: 8192, runtime_min: 180}
+  rsem_prepare_reference: {threads: 4, mem_mb: 8192, runtime_min: 180}
+  rsem: {threads: 8, mem_mb: 16384, runtime_min: 360}
+  deeptools: {threads: 4, mem_mb: 4096, runtime_min: 120}
+  multiqc: {threads: 1, mem_mb: 2048, runtime_min: 60}

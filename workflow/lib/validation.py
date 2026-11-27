@@ -5,6 +5,13 @@ import re
 from typing import Any
 
 from clip import coverage_normalization_mode, validate_qname_regex
+from mutprof import (
+    ANOMALY_MODES,
+    VALID_LIBRARY_TYPES,
+    anomaly_calling_selection,
+    normalize_mutprof_library_type,
+    parse_configured_mut_types,
+)
 from params import MULTI_STAGE_TOOL_SECTIONS
 from refs import INDEX_KEYS, genome_fasta, index_requires_build, path_exists
 from samples import (
@@ -78,7 +85,15 @@ def _required_tools(config: dict[str, Any], samples: list[dict[str, str]]) -> li
     if _enabled(config, "alignment"):
         tools.extend([str(_module(config, "alignment").get("tool") or ""), "samtools"])
     if any(
-        _enabled(config, name) for name in ("mark_duplicates", "bam_filter", "bam_qc")
+        _enabled(config, name)
+        for name in (
+            "mark_duplicates",
+            "bam_filter",
+            "bam_qc",
+            "anomaly_calling",
+            "mutation_counts",
+            "editing_tracks",
+        )
     ):
         tools.append("samtools")
     if any(
@@ -191,29 +206,22 @@ def _validate_adapters(
         )
 
 
-def _validate_eclip(
+def _validate_umi_settings(
     config: dict[str, Any],
     samples: list[dict[str, str]],
+    raw_layouts: set[str],
     errors: list[str],
     warnings: list[str],
 ) -> None:
-    if config.get("assay") != "eclip":
-        return
-
     stage = input_stage(config)
     if stage not in {"raw", "demultiplexed", "umi_extracted"}:
         errors.append(
             "preprocessing.input_stage must be raw, demultiplexed, or umi_extracted"
         )
-    if stage != "raw" and _enabled(config, "inline_barcode_demultiplexing"):
-        warnings.append(
-            f"Inline-barcode demultiplexing is bypassed for preprocessing.input_stage: {stage}"
-        )
     if stage == "umi_extracted" and _enabled(config, "umi_extraction"):
         warnings.append(
             "UMI extraction is bypassed for preprocessing.input_stage: umi_extracted"
         )
-
     if _enabled(config, "mark_duplicates") and _enabled(config, "umi_deduplication"):
         errors.append(
             "modules.mark_duplicates and modules.umi_deduplication are mutually exclusive"
@@ -226,38 +234,6 @@ def _validate_eclip(
         errors.append(
             "UMI deduplication requires UMI extraction unless preprocessing.input_stage is umi_extracted"
         )
-
-    demux = _module(config, "inline_barcode_demultiplexing")
-    if _enabled(config, "inline_barcode_demultiplexing"):
-        if str(demux.get("read", "R1")) not in {"R1", "R2"}:
-            errors.append("modules.inline_barcode_demultiplexing.read must be R1 or R2")
-        if str(demux.get("end", "5prime")) not in {"5prime", "3prime"}:
-            errors.append(
-                "modules.inline_barcode_demultiplexing.end must be 5prime or 3prime"
-            )
-        try:
-            if int(demux.get("max_mismatches", 0)) < 0:
-                raise ValueError
-        except (TypeError, ValueError):
-            errors.append(
-                "modules.inline_barcode_demultiplexing.max_mismatches must be >= 0"
-            )
-
-    for row in samples:
-        if row.get("sra_id") and not row.get("fastq_1"):
-            if row.get("sra_layout") not in {"single", "paired"}:
-                errors.append(
-                    f"eCLIP SRA sample unit {unit_key(row)} requires explicit sra_layout (single or paired)"
-                )
-
-    raw_layouts: set[str] = set()
-    for sample in sample_ids(samples):
-        try:
-            raw_layouts.add(sample_layout(samples, sample))
-        except ValueError:
-            continue
-    if len(raw_layouts) > 1:
-        errors.append("eCLIP runs must use one raw FASTQ layout")
 
     umi = _module(config, "umi_extraction")
     if _enabled(config, "umi_extraction"):
@@ -376,6 +352,217 @@ def _validate_eclip(
             )
         except (ValueError, re.error) as exc:
             errors.append(str(exc))
+
+
+def _validate_mutational_profiling(
+    config: dict[str, Any],
+    samples: list[dict[str, str]],
+    errors: list[str],
+    warnings: list[str],
+) -> None:
+    if config.get("assay") != "mutational_profiling":
+        return
+
+    raw_layouts: set[str] = set()
+    for sample in sample_ids(samples):
+        try:
+            raw_layouts.add(sample_layout(samples, sample))
+        except ValueError:
+            continue
+
+    _validate_umi_settings(config, samples, raw_layouts, errors, warnings)
+
+    for row in samples:
+        if row.get("sra_id") and not row.get("fastq_1"):
+            if row.get("sra_layout") not in {"single", "paired"}:
+                errors.append(
+                    f"Mutational profiling SRA sample unit {unit_key(row)} requires explicit sra_layout (single or paired)"
+                )
+
+    valid_library_types_seen = True
+    for sample in sample_ids(samples):
+        try:
+            processed_sample_layout(config, samples, sample)
+        except ValueError as exc:
+            errors.append(str(exc))
+        for key in ("condition", "replicate", "strandedness", "library_type", "target"):
+            try:
+                sample_metadata(samples, sample, key)
+            except ValueError as exc:
+                errors.append(str(exc))
+                if key == "library_type":
+                    valid_library_types_seen = False
+        try:
+            lib_type = normalize_mutprof_library_type(
+                sample_metadata(samples, sample, "library_type")
+            )
+            if lib_type not in VALID_LIBRARY_TYPES:
+                errors.append(
+                    f"Sample {sample} has invalid library_type '{lib_type}' "
+                    "(expected treated or negative_control)"
+                )
+                valid_library_types_seen = False
+        except ValueError:
+            valid_library_types_seen = False
+
+    reference = config.get("reference", {}) or {}
+    aligner = str(_module(config, "alignment").get("tool") or "")
+    active_tools = config.get("tools", {}) or {}
+
+    if _enabled(config, "editing_tracks") and not _enabled(config, "mutation_counts"):
+        errors.append("modules.editing_tracks requires modules.mutation_counts to be enabled")
+
+    if _enabled(config, "mutation_counts"):
+        mc = _module(config, "mutation_counts")
+        try:
+            parse_configured_mut_types(config)
+        except ValueError as exc:
+            errors.append(str(exc))
+        for key, min_val in (
+            ("min_base_quality", 0),
+            ("min_end_distance", 0),
+            ("min_depth", 1),
+        ):
+            try:
+                if int(mc.get(key, min_val)) < min_val:
+                    raise ValueError
+            except (TypeError, ValueError):
+                errors.append(
+                    f"modules.mutation_counts.{key} must be an integer >= {min_val}"
+                )
+        try:
+            int(mc.get("indel_flank", 3))
+        except (TypeError, ValueError):
+            errors.append("modules.mutation_counts.indel_flank must be an integer")
+
+        if aligner == "star":
+            star_profile = active_tools.get("star", {}).get("params", {}) or {}
+            base_align = dict(star_profile.get("align", star_profile) or {})
+            mod_align = _module(config, "alignment").get("params", {}) or {}
+            if isinstance(mod_align.get("align"), dict):
+                mod_align = mod_align.get("align", {}) or {}
+            base_align.update(mod_align)
+            sam_attrs = str(base_align.get("outSAMattributes", "NH HI AS NM MD")).split()
+            if "MD" not in sam_attrs:
+                errors.append(
+                    "STAR outSAMattributes must include 'MD' when modules.mutation_counts is enabled"
+                )
+
+    if _enabled(config, "anomaly_calling"):
+        ac = _module(config, "anomaly_calling")
+        if not reference.get("fasta"):
+            errors.append("reference.fasta is required by modules.anomaly_calling")
+        mode = str(ac.get("mode", "auto")).strip().lower()
+        if mode not in ANOMALY_MODES:
+            errors.append(
+                "modules.anomaly_calling.mode must be auto, controls, treated, or all_samples"
+            )
+        elif valid_library_types_seen:
+            selected, _ = anomaly_calling_selection(config, samples)
+            if not selected:
+                if mode == "controls":
+                    errors.append(
+                        "modules.anomaly_calling.mode is 'controls', but no negative_control samples are present"
+                    )
+                else:
+                    errors.append(
+                        f"modules.anomaly_calling (mode={mode}) selected zero BAMs"
+                    )
+
+        for key, min_val in (
+            ("min_base_quality", 0),
+            ("min_depth", 1),
+            ("min_alt", 1),
+        ):
+            try:
+                if int(ac.get(key, min_val)) < min_val:
+                    raise ValueError
+            except (TypeError, ValueError):
+                errors.append(
+                    f"modules.anomaly_calling.{key} must be an integer >= {min_val}"
+                )
+        for key, default_f in (("min_freq", 0.25), ("target_min_freq", 0.90)):
+            try:
+                val = float(ac.get(key, default_f))
+                if not (0.0 < val <= 1.0):
+                    raise ValueError
+            except (TypeError, ValueError):
+                errors.append(f"modules.anomaly_calling.{key} must be in (0, 1]")
+        try:
+            err_r = float(ac.get("err_rate", 0.002))
+            if not (0.0 < err_r < 1.0):
+                raise ValueError
+        except (TypeError, ValueError):
+            errors.append("modules.anomaly_calling.err_rate must be in (0, 1)")
+        try:
+            p_cut = float(ac.get("p_cutoff", 1e-4))
+            if not (0.0 < p_cut <= 1.0):
+                raise ValueError
+        except (TypeError, ValueError):
+            errors.append("modules.anomaly_calling.p_cutoff must be in (0, 1]")
+
+    if _enabled(config, "editing_tracks"):
+        et = _module(config, "editing_tracks")
+        if not reference.get("fasta"):
+            errors.append("reference.fasta is required by modules.editing_tracks")
+        for key, min_val in (("min_depth", 1), ("min_edit_count", 0)):
+            try:
+                if int(et.get(key, min_val)) < min_val:
+                    raise ValueError
+            except (TypeError, ValueError):
+                errors.append(
+                    f"modules.editing_tracks.{key} must be an integer >= {min_val}"
+                )
+
+
+def _validate_eclip(
+    config: dict[str, Any],
+    samples: list[dict[str, str]],
+    errors: list[str],
+    warnings: list[str],
+) -> None:
+    if config.get("assay") != "eclip":
+        return
+
+    stage = input_stage(config)
+    if stage != "raw" and _enabled(config, "inline_barcode_demultiplexing"):
+        warnings.append(
+            f"Inline-barcode demultiplexing is bypassed for preprocessing.input_stage: {stage}"
+        )
+
+    demux = _module(config, "inline_barcode_demultiplexing")
+    if _enabled(config, "inline_barcode_demultiplexing"):
+        if str(demux.get("read", "R1")) not in {"R1", "R2"}:
+            errors.append("modules.inline_barcode_demultiplexing.read must be R1 or R2")
+        if str(demux.get("end", "5prime")) not in {"5prime", "3prime"}:
+            errors.append(
+                "modules.inline_barcode_demultiplexing.end must be 5prime or 3prime"
+            )
+        try:
+            if int(demux.get("max_mismatches", 0)) < 0:
+                raise ValueError
+        except (TypeError, ValueError):
+            errors.append(
+                "modules.inline_barcode_demultiplexing.max_mismatches must be >= 0"
+            )
+
+    for row in samples:
+        if row.get("sra_id") and not row.get("fastq_1"):
+            if row.get("sra_layout") not in {"single", "paired"}:
+                errors.append(
+                    f"eCLIP SRA sample unit {unit_key(row)} requires explicit sra_layout (single or paired)"
+                )
+
+    raw_layouts: set[str] = set()
+    for sample in sample_ids(samples):
+        try:
+            raw_layouts.add(sample_layout(samples, sample))
+        except ValueError:
+            continue
+    if len(raw_layouts) > 1:
+        errors.append("eCLIP runs must use one raw FASTQ layout")
+
+    _validate_umi_settings(config, samples, raw_layouts, errors, warnings)
 
     for sample in sample_ids(samples):
         try:
@@ -549,7 +736,13 @@ def validate_resolved_config(
 
     if config.get("schema_version") != 2:
         errors.append("Run config must set schema_version: 2")
-    if assay not in {"generic", "rnaseq", "atacseq", "eclip"}:
+    if assay not in {
+        "generic",
+        "rnaseq",
+        "atacseq",
+        "eclip",
+        "mutational_profiling",
+    }:
         errors.append(f"Unsupported assay: {assay}")
     for key in ("project", "samples", "reference", "results_dir", "modules"):
         if key not in config:
@@ -564,6 +757,7 @@ def validate_resolved_config(
     _validate_tool_extras(config, errors)
     _validate_adapters(config, samples, errors, warnings)
     _validate_eclip(config, samples, errors, warnings)
+    _validate_mutational_profiling(config, samples, errors, warnings)
 
     if assay != "eclip" and _enabled(config, "coverage"):
         if _module(config, "coverage").get("strand_mode") == "separate":
@@ -605,7 +799,7 @@ def validate_resolved_config(
             f"reference.fasta is required because the {aligner} index must be built"
         )
 
-    if assay == "rnaseq" and _enabled(config, "gene_counts"):
+    if assay in {"rnaseq", "mutational_profiling"} and _enabled(config, "gene_counts"):
         modes = _module(config, "gene_counts").get("modes", {}) or {}
         if not any(bool(value) for value in modes.values()):
             errors.append(
@@ -650,7 +844,7 @@ def validate_resolved_config(
                 "RSEM layout, strandedness, and execution inputs are inferred by the workflow; "
                 "remove from tools/rsem.yaml params.quant: " + ", ".join(conflicts)
             )
-    if assay == "rnaseq" and transcript_quant:
+    if assay in {"rnaseq", "mutational_profiling"} and transcript_quant:
         if not reference.get("gtf"):
             errors.append("reference.gtf is required by transcript quantification")
         if not reference.get("fasta"):
@@ -713,7 +907,9 @@ def validate_resolved_config(
                 continue
             if not row.get(column):
                 errors.append(f"Sample {sample} is missing {column}")
-        if assay == "rnaseq" and row.get("strandedness") not in {
+        if assay in {"rnaseq", "mutational_profiling"} and row.get(
+            "strandedness"
+        ) not in {
             "unstranded",
             "forward",
             "reverse",

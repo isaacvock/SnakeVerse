@@ -1,0 +1,2 @@
+# CI pointer config for unstranded single-end mutational profiling without negative controls.
+run_config: .test/configs/runs/mutprof_unstranded_nocontrols.yaml

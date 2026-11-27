@@ -202,7 +202,15 @@ def required_tools(config: dict[str, Any], rows: list[dict[str, str]]) -> list[s
         tools.extend(["umi_tools", "samtools"])
     if any(
         module_enabled(config, name)
-        for name in ("alignment", "mark_duplicates", "bam_filter", "bam_qc")
+        for name in (
+            "alignment",
+            "mark_duplicates",
+            "bam_filter",
+            "bam_qc",
+            "anomaly_calling",
+            "mutation_counts",
+            "editing_tracks",
+        )
     ):
         tools.append("samtools")
     if any(
@@ -455,6 +463,12 @@ def command_explain(args: argparse.Namespace) -> None:
         )
         for name in ("inline_barcode_demultiplexing", "umi_extraction", "trimming"):
             print(f"  {name}: {module(config, name)}")
+    elif topic[0] == "mutations":
+        print(
+            "Mutational profiling is configured in the run file under anomaly_calling, mutation_counts, and editing_tracks."
+        )
+        for name in ("anomaly_calling", "mutation_counts", "editing_tracks"):
+            print(f"  {name}: {module(config, name)}")
     elif topic[0] == "reference":
         print(f"Reference file: {config['_ngsflow']['reference_file']}")
         print(
@@ -481,7 +495,7 @@ def command_explain(args: argparse.Namespace) -> None:
         print(tool_path.read_text(encoding="utf-8").rstrip())
     else:
         raise ValueError(
-            "Explain topics: preprocessing, trimming, alignment, reference, or tool <name>"
+            "Explain topics: preprocessing, trimming, alignment, mutations, reference, or tool <name>"
         )
 
 

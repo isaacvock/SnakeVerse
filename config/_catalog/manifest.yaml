@@ -83,3 +83,34 @@ assays:
         description: "Karimzadeh et al. ecCLIP with an 8-nt UMI-only R2 and single-end R1 alignment."
         run_template: recipes/ecclip_karimzadeh_2026.yaml
         sample_template: samples/ecclip_karimzadeh_2026.tsv
+
+  mutational_profiling:
+    description: "Mutational-profiling RBP binding and recoding workflows (TRIBE/HyperTRIBE, STAMP, PIE-seq, MAPIT-seq)."
+    toolbox:
+      - fastqc
+      - fastp
+      - cutadapt
+      - sra_tools
+      - umi_tools
+      - star
+      - bowtie2
+      - bwa_mem2
+      - samtools
+      - featurecounts
+      - salmon
+      - rsem
+      - deeptools
+      - multiqc
+    recipes:
+      hypertribe:
+        description: "ADAR-based RBP mutational profiling (TRIBE / HyperTRIBE; A-to-I / AG edits)."
+        run_template: recipes/mutprof_hypertribe.yaml
+        sample_template: samples/mutational_profiling.tsv
+      stamp:
+        description: "APOBEC1-based RBP mutational profiling (STAMP / DART-seq; C-to-U / CT edits)."
+        run_template: recipes/mutprof_stamp.yaml
+        sample_template: samples/mutational_profiling.tsv
+      dual_deaminase:
+        description: "Dual-deaminase RBP mutational profiling (MAPIT-seq / PIE-seq; simultaneous AG and CT edits)."
+        run_template: recipes/mutprof_dual_deaminase.yaml
+        sample_template: samples/mutational_profiling.tsv

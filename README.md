@@ -8,6 +8,9 @@ It currently supports:
 - ENCODE-oriented ATAC-seq with Bowtie2, MACS3, signal tracks, and QC
 - conventional eCLIP and Karimzadeh et al. ecCLIP with inline-barcode
   demultiplexing, UMI-aware BAM deduplication, and CLIP signal tracks
+- mutational-profiling RBP binding workflows (`mutational_profiling`:
+  TRIBE/HyperTRIBE, STAMP, PIE-seq, MAPIT-seq) with SNP/anomaly masking,
+  strand-aware wide per-nucleotide base counts, and editing-rate/count tracks
 
 Snakemake remains the runner. The local `ngsflow.py` script only creates,
 explains, and validates configuration files; it never submits or executes the
@@ -226,6 +229,18 @@ python config/bin/ngsflow.py init-run \
   --run-name rbp_ecclip
 ```
 
+Mutational profiling (HyperTRIBE, STAMP, or dual-deaminase MAPIT-seq/PIE-seq):
+
+```bash
+python config/bin/ngsflow.py init-run \
+  --assay mutational_profiling \
+  --recipe hypertribe \
+  --genome hg38 \
+  --run-name rbp_hypertribe
+```
+
+Other `mutational_profiling` recipes: `stamp` (`CT`) and `dual_deaminase` (`AG, CT`).
+
 Switch among initialized runs with:
 
 ```bash
@@ -399,6 +414,62 @@ scaled log2 enrichment tracks under `tracks/enrichment/` using strand-combined
 representative library counts. The default symmetric pseudocount is 1, and bins
 where both inputs are zero are omitted. An IP without an SMInput is valid and
 produces a warning; enrichment is simply skipped.
+
+## Mutational Profiling (`mutational_profiling`)
+
+The `mutational_profiling` assay supports RNA-editing and recoding RBP assays
+such as **TRIBE / HyperTRIBE** (`hypertribe`, `AG`), **STAMP / DART-seq**
+(`stamp`, `CT`), and **MAPIT-seq / PIE-seq** (`dual_deaminase`, `AG, CT`).
+
+### Sample sheet
+
+```text
+sample_id  unit_id  fastq_1            fastq_2            condition  replicate  strandedness  library_type      target
+RBP_rep1   L001     fastq/rbp1_R1.fq   fastq/rbp1_R2.fq   K562       1          reverse       treated           TDP43
+CTRL_rep1  L001     fastq/ctrl1_R1.fq  fastq/ctrl1_R2.fq  K562       1          reverse       negative_control  GFP
+```
+
+- `strandedness` is `forward`, `reverse`, or `unstranded`. Stranded libraries
+  orient bases into the RNA sense strand (`+` or `-`); `unstranded` libraries
+  emit `+`-reference-strand base counts with `strand = "."`.
+- `library_type` is `treated` or `negative_control`.
+
+### Defaults and outputs
+
+All three shipped recipes relax STAR's mismatch tolerance
+(`outFilterMismatchNoverReadLmax: 0.08`), remove PCR duplicates by default
+(`mark_duplicates: true` and `bam_filter.keep_duplicates: false`, or UMI
+deduplication when `umi_extraction` + `umi_deduplication` are enabled instead),
+and retain optional RNA-seq quantification (`gene_counts`, `salmon`, `rsem`) for
+dual-omics co-profiling.
+
+Key mutational-profiling outputs under `results/<run>/`:
+
+```text
+mutations/anomalies/snps.txt                              REF:ALT:CHR:POS masked positions
+mutations/anomalies/anomalies.tsv                         diagnostic pileup depth, frequency, and p-value table
+mutations/per_base/<sample>.tsv.gz                        chrom, pos, strand, ref_base, depth, A, C, G, T
+tracks/editing/<sample>.<mut_type>.edit_rate.<plus|minus>.bw
+tracks/editing/<sample>.<mut_type>.edit_count.<plus|minus>.bw
+```
+
+- **Anomaly / SNP calling (`modules.anomaly_calling`):** With `mode: auto`
+  (default), if one or more `negative_control` samples are present, all
+  `negative_control` BAMs are pooled to call a conservative set of germline SNPs
+  and background editing artifacts (`min_freq: 0.25`). When no
+  `negative_control` samples are supplied (or `mode: treated` / `all_samples`),
+  mutation-type-aware thresholds apply `min_freq` (`0.25`) to non-assay
+  substitutions and `target_min_freq` (`0.90`) to the editor's target genomic
+  alleles (`AG`/`TC` for `AG`; `CT`/`GA` for `CT`) so high-rate RBP editing
+  sites are not masked out. Flagged coordinates receive position-wide masking.
+- **Wide per-base counts (`modules.mutation_counts`):** Reconciles overlapping
+  paired-end mates per fragment so overlapping reads never double-count depth or
+  edits, masks indel-flanking bases (`indel_flank: 3` bp), filters outer read
+  ends (`min_end_distance: 5` bp), and enforces standard Phred base quality
+  (`min_base_quality: 30`).
+- **Editing tracks (`modules.editing_tracks`):** Enabled by default; set
+  `modules.editing_tracks.enabled: false` to skip track generation or
+  `emit_bedgraph: true` to also write `.bedGraph.gz` files.
 
 ## Adapter Trimming
 

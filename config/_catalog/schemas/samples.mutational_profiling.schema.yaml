@@ -1,0 +1,33 @@
+title: "SnakeVerse mutational profiling sample sheet"
+type: object
+required_columns:
+  - sample_id
+  - unit_id
+  - fastq_1
+  - condition
+  - replicate
+  - strandedness
+  - library_type
+columns:
+  sample_id:
+    description: "Biological sample/replicate identifier."
+  unit_id:
+    description: "Sequencing unit or lane identifier; units for one sample are merged at alignment."
+  fastq_1:
+    description: "Path to R1 FASTQ, relative to the project root or absolute. May be blank when sra_id is provided."
+  fastq_2:
+    description: "Optional path to R2 FASTQ. Leave blank for single-end data."
+  condition:
+    description: "Experimental condition or cell type label."
+  replicate:
+    description: "Biological replicate number or label."
+  strandedness:
+    description: "One of unstranded, forward, or reverse."
+  library_type:
+    description: "One of treated or negative_control."
+  target:
+    description: "Optional RBP fusion/antibody target or control label."
+  sra_id:
+    description: "Optional SRA run accession when local FASTQ paths are blank."
+  sra_layout:
+    description: "Required (single or paired) when sra_id is provided."

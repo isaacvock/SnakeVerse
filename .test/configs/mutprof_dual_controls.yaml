@@ -1,0 +1,2 @@
+# CI pointer config for dual-deaminase mutational profiling with negative controls.
+run_config: .test/configs/runs/mutprof_dual_controls.yaml

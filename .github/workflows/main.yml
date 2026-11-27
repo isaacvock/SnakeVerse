@@ -46,6 +46,7 @@ jobs:
             multiqc
             umi_tools
             pysam
+            pybigwig
           condarc: |
             channels:
               - conda-forge
@@ -62,11 +63,15 @@ jobs:
             workflow/lib/refs.py \
             workflow/lib/samples.py \
             workflow/lib/clip.py \
+            workflow/lib/mutprof.py \
             workflow/lib/tracks.py \
             workflow/lib/validation.py \
             workflow/scripts/gtf_to_gene_saf.py \
             workflow/scripts/qname_umi_to_rx.py \
-            workflow/scripts/stamp_fastq_barcodes.py
+            workflow/scripts/stamp_fastq_barcodes.py \
+            workflow/scripts/call_snps.py \
+            workflow/scripts/count_mutations.py \
+            workflow/scripts/build_editing_tracks.py
           PYTHONPATH=workflow/lib python - <<'PY'
           from params import tool_extra
           from samples import rsem_strandedness_arg
@@ -80,11 +85,12 @@ jobs:
           sample = [{"sample_id": "s1", "unit_id": "u1", "strandedness": "reverse"}]
           assert rsem_strandedness_arg(sample, "s1") == "--strandedness reverse"
           PY
-          pytest -q tests/test_eclip.py
+          pytest -q tests/test_eclip.py tests/test_mutational_profiling.py
 
-      - name: Generate CLIP fixtures
+      - name: Generate CLIP and mutational profiling fixtures
         run: |
           python .test/scripts/generate_eclip_fastqs.py
+          python .test/scripts/generate_mutprof_fastqs.py
           bash .test/scripts/smoke_eclip_preprocessing.sh
 
       - name: Helper script checks
@@ -94,6 +100,7 @@ jobs:
           python config/bin/ngsflow.py list recipes --assay rnaseq
           python config/bin/ngsflow.py list recipes --assay atacseq
           python config/bin/ngsflow.py list recipes --assay eclip
+          python config/bin/ngsflow.py list recipes --assay mutational_profiling
           python config/bin/ngsflow.py explain --configfile .test/configs/generic.yaml
           python config/bin/ngsflow.py explain alignment --configfile .test/configs/generic.yaml
           python config/bin/ngsflow.py explain trimming --configfile .test/configs/generic.yaml
@@ -109,6 +116,9 @@ jobs:
           python config/bin/ngsflow.py validate --configfile .test/configs/eclip_encode.yaml
           python config/bin/ngsflow.py validate --configfile .test/configs/ecclip_2026.yaml
           python config/bin/ngsflow.py validate --configfile .test/configs/eclip_preextracted.yaml
+          python config/bin/ngsflow.py explain mutations --configfile .test/configs/mutprof_dual_controls.yaml
+          python config/bin/ngsflow.py validate --configfile .test/configs/mutprof_dual_controls.yaml
+          python config/bin/ngsflow.py validate --configfile .test/configs/mutprof_unstranded_nocontrols.yaml
 
       - name: Recipe initialization smoke test
         run: |
@@ -152,6 +162,21 @@ jobs:
             --recipe karimzadeh_ecclip_2026 \
             --genome hg38 \
             --run-name smoke-ecclip
+          python config/bin/ngsflow.py init-run \
+            --assay mutational_profiling \
+            --recipe hypertribe \
+            --genome hg38 \
+            --run-name smoke-hypertribe
+          python config/bin/ngsflow.py init-run \
+            --assay mutational_profiling \
+            --recipe stamp \
+            --genome hg38 \
+            --run-name smoke-stamp
+          python config/bin/ngsflow.py init-run \
+            --assay mutational_profiling \
+            --recipe dual_deaminase \
+            --genome hg38 \
+            --run-name smoke-dual
           test -f config/tools/umi_tools.yaml
 
       - name: Snakemake lint
@@ -163,6 +188,8 @@ jobs:
           snakemake --snakefile workflow/Snakefile --configfile .test/configs/eclip_encode.yaml --lint
           snakemake --snakefile workflow/Snakefile --configfile .test/configs/ecclip_2026.yaml --lint
           snakemake --snakefile workflow/Snakefile --configfile .test/configs/eclip_preextracted.yaml --lint
+          snakemake --snakefile workflow/Snakefile --configfile .test/configs/mutprof_dual_controls.yaml --lint
+          snakemake --snakefile workflow/Snakefile --configfile .test/configs/mutprof_unstranded_nocontrols.yaml --lint
 
       - name: Snakemake dry-runs
         run: |
@@ -174,6 +201,8 @@ jobs:
           snakemake --snakefile workflow/Snakefile --configfile .test/configs/eclip_encode.yaml --dry-run --cores 2 --printshellcmds
           snakemake --snakefile workflow/Snakefile --configfile .test/configs/ecclip_2026.yaml --dry-run --cores 2 --printshellcmds
           snakemake --snakefile workflow/Snakefile --configfile .test/configs/eclip_preextracted.yaml --dry-run --cores 2 --printshellcmds
+          snakemake --snakefile workflow/Snakefile --configfile .test/configs/mutprof_dual_controls.yaml --dry-run --cores 2 --printshellcmds
+          snakemake --snakefile workflow/Snakefile --configfile .test/configs/mutprof_unstranded_nocontrols.yaml --dry-run --cores 2 --printshellcmds
 
       - name: Full generic FASTQ-to-BAM run
         run: |
@@ -256,3 +285,22 @@ jobs:
           samtools view .test/results/eclip_preextracted/bam/pre_dedup/PRE_IP_1.bam | grep -q 'BC:Z:GGCTTGT'
           test "$(samtools view -c .test/results/eclip_preextracted/bam/pre_dedup/PRE_IP_1.bam)" -eq 6
           test "$(samtools view -c .test/results/eclip_preextracted/bam/umi_dedup/PRE_IP_1.bam)" -eq 4
+
+      - name: Full mutational profiling runs
+        run: |
+          snakemake --snakefile workflow/Snakefile \
+            --configfile .test/configs/mutprof_dual_controls.yaml \
+            --cores 2 --printshellcmds --show-failed-logs --latency-wait 30
+          snakemake --snakefile workflow/Snakefile \
+            --configfile .test/configs/mutprof_unstranded_nocontrols.yaml \
+            --cores 2 --printshellcmds --show-failed-logs --latency-wait 30
+          grep -q '^A:G:chrMut:1156$' .test/results/mutprof_dual_controls/mutations/anomalies/snps.txt
+          test -s .test/results/mutprof_dual_controls/mutations/per_base/RBP_1.tsv.gz
+          test -s .test/results/mutprof_dual_controls/tracks/editing/RBP_1.AG.edit_rate.plus.bw
+          test -s .test/results/mutprof_dual_controls/tracks/editing/RBP_1.CT.edit_count.minus.bw
+          test -s .test/results/mutprof_dual_controls/tracks/editing/RBP_1.AG.edit_rate.plus.bedGraph.gz
+          grep -q '^A:G:chrMut:10136$' .test/results/mutprof_unstranded_nocontrols/mutations/anomalies/snps.txt
+          grep -q '^C:A:chrMut:10141$' .test/results/mutprof_unstranded_nocontrols/mutations/anomalies/snps.txt
+          ! grep -q '^A:G:chrMut:10131$' .test/results/mutprof_unstranded_nocontrols/mutations/anomalies/snps.txt
+          test -s .test/results/mutprof_unstranded_nocontrols/mutations/per_base/UNSTR_RBP_1.tsv.gz
+          test -s .test/results/mutprof_unstranded_nocontrols/tracks/editing/UNSTR_RBP_1.AG.edit_rate.plus.bw
